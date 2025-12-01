@@ -27,8 +27,8 @@ export default function Home({ onJoin, onCreate, onSetName, playerName }) {
     return (
         <div className="screen-container home-screen">
             <h1 className="logo">GAMEBOX</h1>
-            <p className="subtitle">Multiplayer Team Bonding</p>
 
+            <p className="subtitle">Multiplayer Team Bonding</p>
             <div className="card login-card">
                 <div className="input-group">
                     <label>YOUR NICKNAME</label>

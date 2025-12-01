@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { socket } from './socket';
+import { GAME_METADATA } from './games/registry';
 import Home from './screens/Home';
 import Lobby from './screens/Lobby';
 import GameContainer from './screens/GameContainer';
@@ -59,6 +60,17 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (currentScreen === 'HOME') {
+      document.title = 'Gamebox';
+    } else if (currentScreen === 'LOBBY' && roomData) {
+      document.title = `Lobby - ${roomData.id}`;
+    } else if (currentScreen === 'GAME' && roomData && roomData.game) {
+      const gameName = GAME_METADATA[roomData.game.id]?.name || 'Game';
+      document.title = `${gameName} - ${roomData.id}`;
+    }
+  }, [currentScreen, roomData]);
+
   const handleLogin = (name) => {
     setPlayerData(prev => ({ ...prev, name }));
   };
@@ -99,6 +111,9 @@ function App() {
           me={playerData}
         />
       )}
+      {currentScreen === 'HOME' && (<p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '-20px', marginBottom: '20px' }}>
+        Developed by Teja Dasari using google Antigravity & Gemini
+      </p>)}
     </div>
   );
 }

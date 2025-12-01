@@ -41,21 +41,43 @@ export default function Lobby({ room, me }) {
                     <h3>CHOOSE A GAME</h3>
                     <div className="games-grid">
                         {Object.entries(GAME_METADATA)
-                            .filter(([_, meta]) => !import.meta.env.PROD || !meta.tags?.includes('dev'))
-                            .map(([id, meta]) => (
-                                <div
-                                    key={id}
-                                    className="game-card"
-                                    onClick={() => isHost && socket.emit('start_game', { roomId: room.id, gameId: id })}
-                                >
-                                    <div className="game-image" style={{ backgroundImage: `url(${meta.image})` }}></div>
-                                    <div className="game-info">
-                                        <h4>{meta.name}</h4>
-                                        <p>{meta.description}</p>
+                            .sort(([, a], [, b]) => {
+                                const aDev = a.tags?.includes('dev');
+                                const bDev = b.tags?.includes('dev');
+                                if (aDev === bDev) return a.name.localeCompare(b.name);
+                                return aDev ? 1 : -1;
+                            })
+                            .map(([id, meta]) => {
+                                const isDev = meta.tags?.includes('dev');
+                                const isProd = import.meta.env.PROD;
+                                const isComingSoon = isProd && isDev;
+
+                                return (
+                                    <div
+                                        key={id}
+                                        className={`game-card ${isComingSoon ? 'coming-soon' : ''}`}
+                                        onClick={() => !isComingSoon && isHost && socket.emit('start_game', { roomId: room.id, gameId: id })}
+                                        style={isComingSoon ? { cursor: 'not-allowed', opacity: 0.7 } : {}}
+                                    >
+                                        <div className="game-image" style={{ backgroundImage: `url(${meta.image})` }}>
+                                            {isComingSoon && (
+                                                <div style={{
+                                                    width: '100%', height: '100%',
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    background: 'rgba(0,0,0,0.6)', color: '#fff', fontWeight: 'bold'
+                                                }}>
+                                                    COMING SOON
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="game-info">
+                                            <h4>{meta.name}</h4>
+                                            <p>{isComingSoon ? 'Under Development' : meta.description}</p>
+                                        </div>
+                                        {!isComingSoon && isHost && <span className="play-tag">PLAY NOW</span>}
                                     </div>
-                                    {isHost && <span className="play-tag">PLAY NOW</span>}
-                                </div>
-                            ))}
+                                );
+                            })}
 
 
                     </div>
