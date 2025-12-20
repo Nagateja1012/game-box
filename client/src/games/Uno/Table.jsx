@@ -26,6 +26,25 @@ export default function Table({
         orderedOpponents.push(players[idx]);
     }
 
+
+    const [showTurnIndicator, setShowTurnIndicator] = React.useState(true);
+    const prevTurnIndex = React.useRef(turnIndex);
+
+    React.useEffect(() => {
+        // Hide after 5 seconds on mount
+        const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    React.useEffect(() => {
+        if (turnIndex !== prevTurnIndex.current) {
+            setShowTurnIndicator(true);
+            prevTurnIndex.current = turnIndex;
+            const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [turnIndex]);
+
     return (
         <div className="uno-table">
             <div className="opponents-ring">
@@ -46,7 +65,7 @@ export default function Table({
 
                     // Convert to radians
                     const rad = (angle * Math.PI) / 180;
-                    const radius = 250; // px
+                    const radius = 200; // Reduced from 250px to ensure visibility
                     const x = Math.cos(rad) * radius;
                     const y = Math.sin(rad) * radius;
 
@@ -80,7 +99,8 @@ export default function Table({
                 })}
             </div>
 
-            <div className="center-area">
+            <div className="center-area" style={{ position: 'relative' }}>
+
                 <div className="deck-pile" onClick={onDraw}>
                     <Card size="normal" /> {/* Back of card */}
                 </div>
@@ -106,17 +126,35 @@ export default function Table({
                             }}
                         />
                     )}
-                </div>
-            </div>
 
-            <div className="turn-indicator" style={{
-                top: '10%',
-                transform: 'translateX(-50%) scale(1.2)',
-                background: 'rgba(0,0,0,0.4)',
-                backdropFilter: 'blur(5px)',
-                border: '1px solid rgba(255,255,255,0.2)'
-            }}>
-                {players[turnIndex].name}'s Turn
+                </div>
+                {showTurnIndicator && (
+                    <div className="turn-indicator" style={{
+                        position: 'absolute',
+                        bottom: '100px', // Closer to the cards (10px gap)
+                        left: '50%',
+                        top: '110%',
+                        transform: 'translateX(-50%)',
+                        background: 'rgba(0, 0, 0, 0.6)', // Darker background
+                        padding: '10px 30px', // More padding
+                        borderRadius: '50px', // Fully rounded
+                        whiteSpace: 'pre-wrap', // Preserve whitespace but wrap
+                        width: 'max-content', // Hug content
+                        maxWidth: '80vw', // Max width
+                        textAlign: 'center',
+                        zIndex: 10,
+                        fontWeight: 'bold',
+                        fontSize: '1.2rem', // Larger text
+                        border: '1px solid rgba(255,255,255,0.4)',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+                        animation: 'fadeIn 0.3s ease-out',
+                        display: 'flex', // Ensure proper box model
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        {players[turnIndex].name}'s Turn
+                    </div>
+                )}
             </div>
         </div>
     );

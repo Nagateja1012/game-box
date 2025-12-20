@@ -14,14 +14,23 @@ export default function Lobby({ room, me }) {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const handleLeave = () => {
+        socket.emit('leave_room', { roomId: room.id });
+    };
+
     return (
         <div className="screen-container lobby-screen">
-            <div className="lobby-header">
-                <h2>ROOM: <span className="code" onClick={copyCode} title="Click to copy join link">
-                    {room.id}
-                    {copied && <span style={{ fontSize: '0.5em', marginLeft: 10, color: '#00ff00' }}>COPIED!</span>}
-                </span></h2>
-                <div className="player-count">{room.players.length} Players</div>
+            <div className="lobby-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <h2>ROOM: <span className="code" onClick={copyCode} title="Click to copy join link">
+                        {room.id}
+                        {copied && <span style={{ fontSize: '0.5em', marginLeft: 10, color: '#00ff00' }}>COPIED!</span>}
+                    </span></h2>
+                    <div className="player-count">{room.players.length} Players</div>
+                </div>
+                <button className="btn btn-secondary" onClick={handleLeave} style={{ marginLeft: '10%', padding: '5px 5px 5px 5px', fontSize: '0.8rem', minWidth: 'auto' }}>
+                    LEAVE
+                </button>
             </div>
 
             <div className="lobby-content">
@@ -31,7 +40,12 @@ export default function Lobby({ room, me }) {
                         {room.players.map(p => (
                             <li key={p.id} className={p.id === me.id ? 'me' : ''}>
                                 <span className="avatar">{p.name[0].toUpperCase()}</span>
-                                <span className="name">{p.name} {p.isHost && '👑'}</span>
+                                <div className="player-info">
+                                    <span className="name">{p.name} {p.isHost && '👑'}</span>
+                                    <span className="status" style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '5px' }}>
+                                        ({p.status || 'WAITING'})
+                                    </span>
+                                </div>
                             </li>
                         ))}
                     </ul>

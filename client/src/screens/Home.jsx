@@ -24,6 +24,16 @@ export default function Home({ onJoin, onCreate, onSetName, playerName }) {
         onJoin(joinCode);
     };
 
+    const [showConfirmation, setShowConfirmation] = useState(false);
+
+    const handleCreateClick = () => {
+        if (isLocked && joinCode) {
+            setShowConfirmation(true);
+        } else {
+            onCreate();
+        }
+    };
+
     return (
         <div className="screen-container home-screen">
             <h1 className="logo">GAMEBOX</h1>
@@ -74,12 +84,50 @@ export default function Home({ onJoin, onCreate, onSetName, playerName }) {
                     <div className="divider">OR</div>
 
                     <div className="join-section">
-                        <button className="btn btn-primary" onClick={onCreate}>
+                        <button className="btn btn-primary" onClick={handleCreateClick}>
                             CREATE ROOM
                         </button>
                     </div>
                 </div>
             </div>
+
+            {showConfirmation && (
+                <div className="modal-overlay" style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.8)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 1000
+                }}>
+                    <div className="modal-content" style={{
+                        background: '#2a2a2a',
+                        padding: '30px',
+                        borderRadius: '15px',
+                        maxWidth: '400px',
+                        textAlign: 'center',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                    }}>
+                        <h3 style={{ marginTop: 0 }}>Create New Room?</h3>
+                        <p>Looks like you already have a room code ({joinCode}). Do you want to create a new room anyway?</p>
+                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                            <button className="btn btn-secondary" onClick={() => setShowConfirmation(false)}>
+                                No
+                            </button>
+                            <button className="btn btn-primary" onClick={() => {
+                                setShowConfirmation(false);
+                                onCreate();
+                            }}>
+                                Yes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

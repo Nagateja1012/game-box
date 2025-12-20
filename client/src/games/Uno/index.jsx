@@ -48,6 +48,11 @@ export default function Uno({ room, me }) {
         }
     }, [gameState.lastUnoShout?.time]);
 
+    // Safety check
+    if (!gameState || !gameState.players) {
+        return <div className="uno-game">Loading game state...</div>;
+    }
+
     // If game ended
     if (gameState.gameStatus === 'ENDED') {
         return (
@@ -55,14 +60,14 @@ export default function Uno({ room, me }) {
                 <div className="winner-overlay">
                     <h1>WINNER!</h1>
                     <div className="winner-avatar" style={{ width: 100, height: 100, fontSize: '3em' }}>
-                        {gameState.winner.name[0]}
+                        {gameState.winner?.name?.[0] || '?'}
                     </div>
-                    <h2>{gameState.winner.name}</h2>
+                    <h2>{gameState.winner?.name || 'Unknown'}</h2>
 
                     <div className="scores-board" style={{ margin: '20px 0', background: 'rgba(0,0,0,0.5)', padding: 20, borderRadius: 10 }}>
                         <h3>SCORES</h3>
                         {gameState.players
-                            .map(p => ({ ...p, score: gameState.scores[p.id] || 0 }))
+                            .map(p => ({ ...p, score: gameState.scores?.[p.id] || 0 }))
                             .sort((a, b) => a.score - b.score)
                             .map((p, i) => (
                                 <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', width: 200, margin: '5px auto', fontWeight: i === 0 ? 'bold' : 'normal' }}>
@@ -96,9 +101,9 @@ export default function Uno({ room, me }) {
         );
     }
 
-    const myHand = gameState.hands[me.id] || [];
+    const myHand = gameState.hands?.[me.id] || [];
     const mePlayer = gameState.players.find(p => p.id === me.id);
-    const isMyTurn = gameState.players[gameState.turnIndex].id === me.id;
+    const isMyTurn = gameState.players[gameState.turnIndex]?.id === me.id;
 
     const handlePlayCard = (card) => {
         if (!isMyTurn) return;

@@ -4,12 +4,20 @@ import { GAME_METADATA } from './games/registry';
 import Home from './screens/Home';
 import Lobby from './screens/Lobby';
 import GameContainer from './screens/GameContainer';
+import ErrorBoundary from './components/ErrorBoundary';
 import './App.css';
 
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [currentScreen, setCurrentScreen] = useState('HOME'); // HOME, LOBBY, GAME
-  const [playerData, setPlayerData] = useState({ name: '', id: '' });
+  const [playerData, setPlayerData] = useState(() => {
+    const savedName = localStorage.getItem('player_name') || '';
+    const savedUserId = localStorage.getItem('user_id') || `user_${Math.random().toString(36).substr(2, 9)}`;
+    if (!localStorage.getItem('user_id')) {
+      localStorage.setItem('user_id', savedUserId);
+    }
+    return { name: savedName, id: '', userId: savedUserId };
+  });
   const [roomData, setRoomData] = useState(null);
   const [error, setError] = useState('');
 
@@ -29,33 +37,67 @@ function App() {
 
     function onRoomUpdated(room) {
       setRoomData(room);
+      // Save room ID for reconnection
+      localStorage.setItem('room_id', room.id);
+
       if (room.status === 'PLAYING') {
-        setCurrentScreen('GAME');
+        // Check if I am playing or waiting
+        const me = room.players.find(p => p.id === socket.id);
+        if (me && me.status === 'WAITING') {
+          setCurrentScreen('LOBBY');
+        } else {
+          setCurrentScreen('GAME');
+        }
       } else {
         setCurrentScreen('LOBBY');
       }
       setError('');
     }
 
+    function onLeftRoom() {
+      setRoomData(null);
+      setCurrentScreen('HOME');
+      localStorage.removeItem('room_id');
+      setError('');
+    }
+
     function onError(msg) {
-      setError(msg);
+      console.error("Socket Error:", msg);
+      setError(typeof msg === 'string' ? msg : 'An error occurred');
+      setTimeout(() => setError(''), 5000);
+    }
+
+    function onConnectError(err) {
+      console.error("Connection Error:", err);
+      setError("Connection to server failed. Retrying...");
     }
 
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('room_created', onRoomCreated);
     socket.on('room_updated', onRoomUpdated);
+    socket.on('left_room', onLeftRoom);
     socket.on('error', onError);
+    socket.on('connect_error', onConnectError);
 
     // Connect immediately
     socket.connect();
+
+    // Attempt reconnection if room_id exists
+    const savedRoomId = localStorage.getItem('room_id');
+    if (savedRoomId && playerData.name) {
+      console.log("Attempting to reconnect to room:", savedRoomId);
+      socket.emit('join_room', { roomId: savedRoomId, playerName: playerData.name, userId: playerData.userId });
+    }
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room_created', onRoomCreated);
       socket.off('room_updated', onRoomUpdated);
+      socket.off('left_room', onLeftRoom);
       socket.off('error', onError);
+      socket.off('connect_error', onConnectError);
       socket.disconnect();
     };
   }, []);
@@ -73,48 +115,51 @@ function App() {
 
   const handleLogin = (name) => {
     setPlayerData(prev => ({ ...prev, name }));
+    localStorage.setItem('player_name', name);
   };
 
   const createRoom = () => {
     if (!playerData.name) return setError('Please enter a nickname');
-    socket.emit('create_room', { playerName: playerData.name });
+    socket.emit('create_room', { playerName: playerData.name, userId: playerData.userId });
   };
 
   const joinRoom = (roomId) => {
     if (!playerData.name) return setError('Please enter a nickname');
-    socket.emit('join_room', { roomId, playerName: playerData.name });
+    socket.emit('join_room', { roomId, playerName: playerData.name, userId: playerData.userId });
   };
 
   return (
-    <div className="app-container">
-      {error && <div className="error-banner">{error}</div>}
+    <ErrorBoundary>
+      <div className="app-container">
+        {error && <div className="error-banner">{error}</div>}
 
-      {currentScreen === 'HOME' && (
-        <Home
-          onJoin={joinRoom}
-          onCreate={createRoom}
-          onSetName={handleLogin}
-          playerName={playerData.name}
-        />
-      )}
+        {currentScreen === 'HOME' && (
+          <Home
+            onJoin={joinRoom}
+            onCreate={createRoom}
+            onSetName={handleLogin}
+            playerName={playerData.name}
+          />
+        )}
 
-      {currentScreen === 'LOBBY' && roomData && (
-        <Lobby
-          room={roomData}
-          me={playerData}
-        />
-      )}
+        {currentScreen === 'LOBBY' && roomData && (
+          <Lobby
+            room={roomData}
+            me={playerData}
+          />
+        )}
 
-      {currentScreen === 'GAME' && roomData && (
-        <GameContainer
-          room={roomData}
-          me={playerData}
-        />
-      )}
-      {currentScreen === 'HOME' && (<p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '-20px', marginBottom: '20px' }}>
-        Developed by Teja Dasari using google Antigravity & Gemini
-      </p>)}
-    </div>
+        {currentScreen === 'GAME' && roomData && (
+          <GameContainer
+            room={roomData}
+            me={playerData}
+          />
+        )}
+        {currentScreen === 'HOME' && (<p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '-20px', marginBottom: '20px' }}>
+          Developed by Teja Dasari using google Antigravity & Gemini
+        </p>)}
+      </div>
+    </ErrorBoundary>
   );
 }
 
