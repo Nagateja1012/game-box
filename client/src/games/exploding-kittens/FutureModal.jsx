@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Card from './Card';
+import Button from '../../design-system/Button';
 
 export default function FutureModal({ cards, isAlter, onClose, onReorder }) {
     const [orderedCards, setOrderedCards] = useState([...cards]);
@@ -36,17 +37,17 @@ export default function FutureModal({ cards, isAlter, onClose, onReorder }) {
                             <Card card={card} />
                             {isAlter && (
                                 <div style={{ marginTop: 5 }}>
-                                    {index > 0 && <button onClick={() => moveCard(index, index - 1)}>⬅️</button>}
-                                    {index < orderedCards.length - 1 && <button onClick={() => moveCard(index, index + 1)}>➡️</button>}
+                                    {index > 0 && <Button variant="secondary" style={{ padding: '2px 5px', fontSize: '0.8rem' }} onClick={() => moveCard(index, index - 1)}>⬅️</Button>}
+                                    {index < orderedCards.length - 1 && <Button variant="secondary" style={{ padding: '2px 5px', fontSize: '0.8rem', marginLeft: 5 }} onClick={() => moveCard(index, index + 1)}>➡️</Button>}
                                 </div>
                             )}
                         </div>
                     ))}
                 </div>
 
-                <button className="ek-btn" onClick={handleConfirm}>
+                <Button variant="primary" className="ek-btn" onClick={handleConfirm}>
                     {isAlter ? 'Confirm Order' : 'Done'}
-                </button>
+                </Button>
             </div>
         </div>
     );

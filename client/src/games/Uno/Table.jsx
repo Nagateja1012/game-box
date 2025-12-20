@@ -32,7 +32,7 @@ export default function Table({
 
     React.useEffect(() => {
         // Hide after 5 seconds on mount
-        const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+        const timer = setTimeout(() => setShowTurnIndicator(false), 1000);
         return () => clearTimeout(timer);
     }, []);
 
@@ -40,7 +40,7 @@ export default function Table({
         if (turnIndex !== prevTurnIndex.current) {
             setShowTurnIndicator(true);
             prevTurnIndex.current = turnIndex;
-            const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+            const timer = setTimeout(() => setShowTurnIndicator(false), 1000);
             return () => clearTimeout(timer);
         }
     }, [turnIndex]);
@@ -99,62 +99,55 @@ export default function Table({
                 })}
             </div>
 
-            <div className="center-area" style={{ position: 'relative' }}>
-
-                <div className="deck-pile" onClick={onDraw}>
-                    <Card size="normal" /> {/* Back of card */}
-                </div>
-                <div className="discard-pile">
-                    {topCard && <Card key={topCard.id} card={topCard} size="normal" />}
-                    {/* Show current color indicator if Wild */}
-                    {topCard?.color === 'BLACK' && currentColor && (
-                        <div
-                            className="color-indicator"
-                            style={{
-                                position: 'absolute',
-                                bottom: -20,
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                background: currentColor.toLowerCase() === 'red' ? '#ff5555' :
-                                    currentColor.toLowerCase() === 'blue' ? '#5555ff' :
-                                        currentColor.toLowerCase() === 'green' ? '#55ff55' :
-                                            '#ffaa00',
-                                border: '2px solid white'
-                            }}
-                        />
-                    )}
-
-                </div>
+            <div className="center-area" style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 {showTurnIndicator && (
                     <div className="turn-indicator" style={{
-                        position: 'absolute',
-                        bottom: '100px', // Closer to the cards (10px gap)
-                        left: '50%',
-                        top: '110%',
-                        transform: 'translateX(-50%)',
-                        background: 'rgba(0, 0, 0, 0.6)', // Darker background
-                        padding: '10px 30px', // More padding
-                        borderRadius: '50px', // Fully rounded
-                        whiteSpace: 'pre-wrap', // Preserve whitespace but wrap
-                        width: 'max-content', // Hug content
-                        maxWidth: '80vw', // Max width
+                        background: players[turnIndex].id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.7)', // Use theme accent color
+                        padding: '10px 30px',
+                        borderRadius: '50px',
+                        whiteSpace: 'nowrap',
+                        width: 'max-content',
                         textAlign: 'center',
                         zIndex: 10,
                         fontWeight: 'bold',
-                        fontSize: '1.2rem', // Larger text
-                        border: '1px solid rgba(255,255,255,0.4)',
+                        fontSize: '1.2rem',
+                        border: players[turnIndex].id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.4)',
                         boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
                         animation: 'fadeIn 0.3s ease-out',
-                        display: 'flex', // Ensure proper box model
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        marginBottom: '20px', // Spacing above the deck
                     }}>
-                        {players[turnIndex].name}'s Turn
+                        {players[turnIndex].id === me.id ? 'Your Turn' : `${players[turnIndex].name}'s Turn`}
                     </div>
                 )}
+
+                <div className="piles-container" style={{ display: 'flex', gap: '40px', alignItems: 'center' }}>
+                    <div className="deck-pile" onClick={onDraw}>
+                        <Card size="normal" /> {/* Back of card */}
+                    </div>
+                    <div className="discard-pile" style={{ position: 'relative' }}>
+                        {topCard && <Card key={topCard.id} card={topCard} size="normal" />}
+                        {/* Show current color indicator if Wild */}
+                        {topCard?.color === 'BLACK' && currentColor && (
+                            <div
+                                className="color-indicator"
+                                style={{
+                                    position: 'absolute',
+                                    bottom: -20,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 20,
+                                    height: 20,
+                                    borderRadius: '50%',
+                                    background: currentColor.toLowerCase() === 'red' ? '#ff5555' :
+                                        currentColor.toLowerCase() === 'blue' ? '#5555ff' :
+                                            currentColor.toLowerCase() === 'green' ? '#55ff55' :
+                                                '#ffaa00',
+                                    border: '2px solid white'
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );

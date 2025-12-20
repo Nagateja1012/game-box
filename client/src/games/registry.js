@@ -1,5 +1,5 @@
-import Uno from './Uno';
-import ExplodingKittens from './ExplodingKittens';
+import Uno from './uno';
+import ExplodingKittens from './exploding-kittens';
 
 export const GAME_REGISTRY = {
     'UNO': Uno,

@@ -22,7 +22,7 @@ export default function Lobby({ room, me }) {
         <div className="screen-container lobby-screen">
             <div className="lobby-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <h2>ROOM: <span className="code" onClick={copyCode} title="Click to copy join link">
+                    <h2>ROOM <span className="code" onClick={copyCode} title="Click to copy join link">
                         {room.id}
                         {copied && <span style={{ fontSize: '0.5em', marginLeft: 10, color: '#00ff00' }}>COPIED!</span>}
                     </span></h2>

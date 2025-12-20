@@ -1,5 +1,5 @@
-const UnoGame = require('./games/Uno');
-const ExplodingKittens = require('./games/ExplodingKittens');
+const UnoGame = require('./games/uno/logic');
+const ExplodingKittens = require('./games/exploding-kittens/logic');
 const logger = require('./utils/logger');
 
 const GAME_REGISTRY = {

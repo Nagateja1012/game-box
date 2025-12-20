@@ -4,6 +4,7 @@ import Table from './Table';
 import PlayerHand from './PlayerHand';
 import { soundManager } from '../../utils/soundManager';
 import './uno.css';
+import Button from '../../design-system/Button';
 
 export default function Uno({ room, me }) {
     const { gameState } = room;
@@ -78,23 +79,31 @@ export default function Uno({ room, me }) {
                     </div>
 
                     {room.players.find(p => p.id === me.id)?.isHost && (
-                        <button
-                            className="btn btn-primary"
-                            style={{ marginTop: 20, padding: '10px 30px' }}
+                        <Button
+                            variant="primary"
+                            style={{
+                                marginTop: 20,
+                                padding: '12px 30px',
+                                width: '200px'
+                            }}
                             onClick={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
                         >
                             PLAY AGAIN
-                        </button>
+                        </Button>
                     )}
 
                     {room.players.find(p => p.id === me.id)?.isHost && (
-                        <button
-                            className="btn btn-secondary"
-                            style={{ marginTop: 10, padding: '10px 30px' }}
+                        <Button
+                            variant="secondary"
+                            style={{
+                                marginTop: 10,
+                                padding: '12px 30px',
+                                width: '200px'
+                            }}
                             onClick={() => socket.emit('stop_game', { roomId: room.id })}
                         >
                             BACK TO LOBBY
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
@@ -186,13 +195,24 @@ export default function Uno({ room, me }) {
             />
 
             {isMyTurn && mePlayer?.hasDrawn && (
-                <button
-                    className="btn btn-secondary"
-                    style={{ position: 'absolute', bottom: 180, left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}
+                <Button
+                    variant="secondary"
+                    className="pass-btn"
+                    style={{
+                        position: 'absolute',
+                        bottom: 180,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10,
+                        padding: '12px 40px',
+                        fontSize: '1.1rem',
+                        minWidth: '200px',
+                        boxShadow: '0 8px 16px rgba(0,0,0,0.3)'
+                    }}
                     onClick={handlePass}
                 >
                     PASS TURN
-                </button>
+                </Button>
             )}
 
             {gameState.drawStack > 0 && (
