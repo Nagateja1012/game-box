@@ -1,5 +1,6 @@
 import React from 'react';
 import Card from './Card';
+import PlayerAvatar from '../../design-system/PlayerAvatar';
 
 export default function Table({
     gameState,
@@ -17,7 +18,12 @@ export default function Table({
             <div className="ek-opponents">
                 {opponents.map(p => (
                     <div key={p.id} className={`ek-opponent ${p.id === currentPlayerId ? 'active' : ''} ${p.isEliminated ? 'eliminated' : ''}`}>
-                        <div className="avatar">{p.name[0]}</div>
+                        <PlayerAvatar
+                            name={p.name}
+                            isTurn={p.id === currentPlayerId}
+                            isEliminated={p.isEliminated}
+                            size="sm"
+                        />
                         <div className="name">{p.name}</div>
                         <div className="card-count">🎴 {p.cardCount}</div>
                     </div>

@@ -20,6 +20,7 @@ function App() {
   });
   const [roomData, setRoomData] = useState(null);
   const [error, setError] = useState('');
+  const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
   useEffect(() => {
     function onConnect() {
@@ -32,11 +33,13 @@ function App() {
     }
 
     function onRoomCreated(roomId) {
-      // Wait for room_updated to actually enter
+      // Room ID received, we might still be loading state so keeping isCreatingRoom true
+      // until onRoomUpdated is called
     }
 
     function onRoomUpdated(room) {
       setRoomData(room);
+      setIsCreatingRoom(false); // Done loading
       // Save room ID for reconnection
       localStorage.setItem('room_id', room.id);
 
@@ -64,6 +67,7 @@ function App() {
     function onError(msg) {
       console.error("Socket Error:", msg);
       setError(typeof msg === 'string' ? msg : 'An error occurred');
+      setIsCreatingRoom(false); // Reset on error
       setTimeout(() => setError(''), 5000);
     }
 
@@ -120,6 +124,7 @@ function App() {
 
   const createRoom = () => {
     if (!playerData.name) return setError('Please enter a nickname');
+    setIsCreatingRoom(true); // Start loading
     socket.emit('create_room', { playerName: playerData.name, userId: playerData.userId });
   };
 
@@ -130,7 +135,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="app-container">
+      <div className={`app-container ${currentScreen !== 'GAME' ? 'standard-layout' : ''}`}>
         {error && <div className="error-banner">{error}</div>}
 
         {currentScreen === 'HOME' && (
@@ -139,6 +144,7 @@ function App() {
             onCreate={createRoom}
             onSetName={handleLogin}
             playerName={playerData.name}
+            isCreatingRoom={isCreatingRoom}
           />
         )}
 

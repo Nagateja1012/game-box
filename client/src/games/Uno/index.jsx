@@ -5,6 +5,8 @@ import PlayerHand from './PlayerHand';
 import { soundManager } from '../../utils/soundManager';
 import './uno.css';
 import Button from '../../design-system/Button';
+import GameOverOverlay from '../../design-system/GameOverOverlay';
+import GameWrapper from '../../screens/GameWrapper';
 
 export default function Uno({ room, me }) {
     const { gameState } = room;
@@ -51,63 +53,7 @@ export default function Uno({ room, me }) {
 
     // Safety check
     if (!gameState || !gameState.players) {
-        return <div className="uno-game">Loading game state...</div>;
-    }
-
-    // If game ended
-    if (gameState.gameStatus === 'ENDED') {
-        return (
-            <div className="uno-game">
-                <div className="winner-overlay">
-                    <h1>WINNER!</h1>
-                    <div className="winner-avatar" style={{ width: 100, height: 100, fontSize: '3em' }}>
-                        {gameState.winner?.name?.[0] || '?'}
-                    </div>
-                    <h2>{gameState.winner?.name || 'Unknown'}</h2>
-
-                    <div className="scores-board" style={{ margin: '20px 0', background: 'rgba(0,0,0,0.5)', padding: 20, borderRadius: 10 }}>
-                        <h3>SCORES</h3>
-                        {gameState.players
-                            .map(p => ({ ...p, score: gameState.scores?.[p.id] || 0 }))
-                            .sort((a, b) => a.score - b.score)
-                            .map((p, i) => (
-                                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', width: 200, margin: '5px auto', fontWeight: i === 0 ? 'bold' : 'normal' }}>
-                                    <span>#{i + 1} {p.name}</span>
-                                    <span>{p.score}</span>
-                                </div>
-                            ))}
-                    </div>
-
-                    {room.players.find(p => p.id === me.id)?.isHost && (
-                        <Button
-                            variant="primary"
-                            style={{
-                                marginTop: 20,
-                                padding: '12px 30px',
-                                width: '200px'
-                            }}
-                            onClick={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
-                        >
-                            PLAY AGAIN
-                        </Button>
-                    )}
-
-                    {room.players.find(p => p.id === me.id)?.isHost && (
-                        <Button
-                            variant="secondary"
-                            style={{
-                                marginTop: 10,
-                                padding: '12px 30px',
-                                width: '200px'
-                            }}
-                            onClick={() => socket.emit('stop_game', { roomId: room.id })}
-                        >
-                            BACK TO LOBBY
-                        </Button>
-                    )}
-                </div>
-            </div>
-        );
+        return <div className="loading-container">Loading game state...</div>;
     }
 
     const myHand = gameState.hands?.[me.id] || [];
@@ -163,90 +109,149 @@ export default function Uno({ room, me }) {
             roomId: room.id,
             action: { type: 'UNO_SHOUT' }
         });
-        // Sound handled by effect
     };
+
+    const isHost = room.players.find(p => p.id === me.id)?.isHost;
+
+    // Game Over Overlay
+    let gameOverNode = null;
+    if (gameState.gameStatus === 'ENDED') {
+        const actions = (
+            <>
+                {isHost && (
+                    <Button
+                        variant="primary"
+                        style={{ width: '200px' }}
+                        onClick={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
+                    >
+                        PLAY AGAIN
+                    </Button>
+                )}
+
+                {isHost && (
+                    <Button
+                        variant="primary"
+                        style={{
+                            width: '200px',
+                            border: '2px solid #ff5555',
+                            background: 'rgba(255, 85, 85, 0.95)'
+                        }}
+                        onClick={() => socket.emit('stop_game', { roomId: room.id })}
+                    >
+                        CLOSE GAME
+                    </Button>
+                )}
+
+                <Button
+                    variant="secondary"
+                    style={{ width: '200px' }}
+                    onClick={() => socket.emit('leave_game', { roomId: room.id })}
+                >
+                    BACK TO LOBBY
+                </Button>
+            </>
+        );
+
+        gameOverNode = (
+            <GameOverOverlay
+                winner={gameState.winner}
+                players={gameState.players}
+                scores={gameState.scores || {}}
+                actions={actions}
+            />
+        );
+    }
 
     const showUnoButton = isMyTurn && myHand.length <= 2 && !gameState.players.find(p => p.id === me.id)?.isUno;
 
     return (
-        <div className="uno-game">
-            <button
-                className="mute-btn"
-                onClick={() => setMuted(!muted)}
-                style={{ position: 'absolute', top: 20, right: 20, zIndex: 100, background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-            >
-                {muted ? '🔇' : '🔊'}
-            </button>
+        <GameWrapper
+            room={room}
+            me={me}
+            title="UNO"
+            playScreen={
+                <div className="uno-game" style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+                    <button
+                        className="mute-btn"
+                        onClick={() => setMuted(!muted)}
+                        style={{ position: 'absolute', top: 20, right: 20, zIndex: 100, background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
+                    >
+                        {muted ? '🔇' : '🔊'}
+                    </button>
 
-            <Table
-                players={gameState.players}
-                me={me}
-                topCard={gameState.topCard}
-                direction={gameState.direction}
-                turnIndex={gameState.turnIndex}
-                onDraw={handleDraw}
-                currentColor={gameState.currentColor}
-            />
+                    <Table
+                        players={gameState.players}
+                        me={me}
+                        topCard={gameState.topCard}
+                        direction={gameState.direction}
+                        turnIndex={gameState.turnIndex}
+                        onDraw={handleDraw}
+                        currentColor={gameState.currentColor}
+                    />
 
-            <PlayerHand
-                hand={myHand}
-                onPlay={handlePlayCard}
-                isTurn={isMyTurn}
-            />
+                    {isMyTurn && mePlayer?.hasDrawn && (
+                        <Button
+                            variant="secondary"
+                            className="pass-btn"
+                            style={{
+                                position: 'absolute',
+                                bottom: 20,
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                zIndex: 10,
+                                padding: '12px 40px',
+                                fontSize: '1.1rem',
+                                minWidth: '200px',
+                                boxShadow: '0 8px 16px rgba(0,0,0,0.3)'
+                            }}
+                            onClick={handlePass}
+                        >
+                            PASS TURN
+                        </Button>
+                    )}
 
-            {isMyTurn && mePlayer?.hasDrawn && (
-                <Button
-                    variant="secondary"
-                    className="pass-btn"
-                    style={{
-                        position: 'absolute',
-                        bottom: 180,
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        zIndex: 10,
-                        padding: '12px 40px',
-                        fontSize: '1.1rem',
-                        minWidth: '200px',
-                        boxShadow: '0 8px 16px rgba(0,0,0,0.3)'
-                    }}
-                    onClick={handlePass}
-                >
-                    PASS TURN
-                </Button>
-            )}
+                    {gameState.drawStack > 0 && (
+                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'red', fontSize: '2em', fontWeight: 'bold', textShadow: '0 0 10px black', pointerEvents: 'none', zIndex: 20 }}>
+                            STACK: +{gameState.drawStack}
+                        </div>
+                    )}
 
-            {gameState.drawStack > 0 && (
-                <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'red', fontSize: '2em', fontWeight: 'bold', textShadow: '0 0 10px black', pointerEvents: 'none' }}>
-                    STACK: +{gameState.drawStack}
+                    {showUnoButton && (
+                        <button className="uno-button" onClick={handleUnoShout} style={{ bottom: '20px' }}>
+                            UNO!
+                        </button>
+                    )}
+
+                    {showColorPicker && (
+                        <div className="color-picker-overlay">
+                            <div className="color-options">
+                                {['RED', 'BLUE', 'GREEN', 'YELLOW'].map(color => (
+                                    <button
+                                        key={color}
+                                        className={`color-btn ${color.toLowerCase()}`}
+                                        onClick={() => handleColorPick(color)}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {unoPopUp && (
+                        <div className="uno-popup-animation">
+                            UNO!
+                            <div className="shouter-name">{unoPopUp.name}</div>
+                        </div>
+                    )}
                 </div>
-            )}
-
-            {showUnoButton && (
-                <button className="uno-button" onClick={handleUnoShout}>
-                    UNO!
-                </button>
-            )}
-
-            {showColorPicker && (
-                <div className="color-picker-overlay">
-                    <div className="color-options">
-                        {['RED', 'BLUE', 'GREEN', 'YELLOW'].map(color => (
-                            <button
-                                key={color}
-                                className={`color-btn ${color.toLowerCase()}`}
-                                onClick={() => handleColorPick(color)}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {unoPopUp && (
-                <div className="uno-popup-animation">
-                    UNO!
-                    <div className="shouter-name">{unoPopUp.name}</div>
-                </div>
-            )}
-        </div>
+            }
+            playerHand={
+                <PlayerHand
+                    hand={myHand}
+                    onPlay={handlePlayCard}
+                    isTurn={isMyTurn}
+                />
+            }
+            overlay={gameOverNode}
+        />
     );
 }

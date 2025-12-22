@@ -96,6 +96,7 @@ class RoomManager {
         room.game = null;
         room.gameState = null;
         room.status = 'LOBBY';
+        room.players.forEach(p => p.status = 'WAITING');
         logger.info(`Game stopped in room ${roomId} by host`);
 
         return { room };
@@ -116,14 +117,12 @@ class RoomManager {
             if (room.game.removePlayer) {
                 const gameEnded = room.game.removePlayer(playerId);
                 if (gameEnded) {
-                    room.status = 'LOBBY';
-                    room.game = null;
-                    room.gameState = null;
-                    room.players.forEach(p => p.status = 'WAITING');
-                    logger.info(`Game ended in room ${roomId} because not enough players`);
-                } else {
-                    room.gameState = room.game.getState();
+                    // Game is naturally over (e.g. 1 player remains)
+                    // We keep room.status as 'PLAYING' so others can see the winner overlay.
+                    // Eventually host will call stop_game to go back to lobby.
+                    logger.info(`Game in room ${roomId} reached end state via player removal`);
                 }
+                room.gameState = room.game.getState();
             }
         }
 
@@ -173,6 +172,12 @@ class RoomManager {
                 room.players.splice(playerIndex, 1);
                 logger.info(`Player ${player.name} (${socketId}) removed from room ${roomId}`);
 
+                // If in game, remove them from game logic too
+                if (room.game && room.status === 'PLAYING') {
+                    room.game.removePlayer(socketId);
+                    room.gameState = room.game.getState();
+                }
+
                 if (room.players.length === 0) {
                     this.rooms.delete(roomId);
                     logger.info(`Room ${roomId} deleted (empty)`);
@@ -180,7 +185,6 @@ class RoomManager {
                     // Migrate host to next player
                     room.players[0].isHost = true;
                     logger.info(`Host migrated to ${room.players[0].name} in room ${roomId}`);
-                    // Notify room of update (handled by caller usually, but good to ensure state is consistent)
                 }
                 return { roomId, room };
             }

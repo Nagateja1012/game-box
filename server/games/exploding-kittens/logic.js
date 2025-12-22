@@ -305,6 +305,43 @@ class ExplodingKittens {
             this.winner = activePlayers[0];
         }
     }
+    removePlayer(playerId) {
+        const playerIndex = this.players.findIndex(p => p.id === playerId);
+        if (playerIndex === -1) return false;
+
+        const player = this.players[playerIndex];
+
+        // Discard their hand
+        if (player.hand && player.hand.length > 0) {
+            this.discardPile.push(...player.hand);
+        }
+
+        const isLeavingPlayerTurn = (this.turnIndex === playerIndex);
+
+        this.players.splice(playerIndex, 1);
+
+        // Adjust turn index
+        if (this.turnIndex > playerIndex) {
+            this.turnIndex--;
+        } else if (this.turnIndex === playerIndex) {
+            // It was their turn. Reset turns for the next person so they aren't punished for the exit.
+            this.turnsToTake = 1;
+            if (this.turnIndex >= this.players.length) {
+                this.turnIndex = 0;
+            }
+        }
+
+        // Check win condition
+        this.checkWinCondition();
+        if (this.winner || this.players.length < 2) {
+            if (!this.winner && this.players.length > 0) {
+                this.winner = this.players[0];
+            }
+            return true; // Game ended
+        }
+
+        return false; // Game continues
+    }
 }
 
 module.exports = ExplodingKittens;

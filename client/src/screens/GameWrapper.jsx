@@ -1,89 +1,83 @@
 import React, { useState } from 'react';
 import { socket } from '../socket';
 import { GAME_METADATA } from '../games/registry';
+import GameLayout from '../design-system/GameLayout';
+import Button from '../design-system/Button';
+import { useGameActions } from '../hooks/useGameActions';
 
-export default function GameWrapper({ room, me, children }) {
-    const [showRules, setShowRules] = useState(false);
-    const isHost = room.players.find(p => p.id === me.id)?.isHost;
+export default function GameWrapper({ room, me, children, playScreen, playerHand, title, overlay }) {
+    const {
+        showRules,
+        setShowRules,
+        showExitConfirmation,
+        handleExit,
+        cancelExit,
+        confirmExit,
+        toggleRules
+    } = useGameActions(room, me);
+
     const gameMeta = GAME_METADATA[room.game.id];
+    const displayTitle = title || gameMeta?.name || 'Game';
 
-    const [showExitConfirmation, setShowExitConfirmation] = useState(false);
+    const leftAction = (
+        <Button variant="secondary" onClick={handleExit} style={{ padding: '8px 20px', fontSize: '0.8rem' }}>
+            LEAVE
+        </Button>
+    );
 
-    const handleExit = () => {
-        setShowExitConfirmation(true);
-    };
+    const rightAction = (
+        <Button variant="secondary" onClick={toggleRules} style={{ padding: '8px 20px', fontSize: '0.8rem' }}>
+            INFO
+        </Button>
+    );
 
-    const confirmExit = () => {
-        socket.emit('leave_game', { roomId: room.id });
-        setShowExitConfirmation(false);
-    };
+    // If game ended, we usually show an overlay, handled by GameLayout's overlay prop
+    // Actually, games might handle their own GameOver. 
 
     return (
-        <div className="game-wrapper">
-            <div className="game-toolbar">
-                <button className="btn-icon exit-btn" onClick={handleExit}>
-                    LEAVE
-                </button>
-                <h3 className="game-title">{gameMeta?.name}</h3>
-                <button className="btn-icon info-btn" onClick={() => setShowRules(true)}>
-                    INFO
-                </button>
-            </div>
-
-            <div className="game-area">
-                {children}
-            </div>
-
-            {showRules && (
-                <div className="modal-overlay" onClick={() => setShowRules(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <h2>{gameMeta?.name} Rules</h2>
-                        <ul>
-                            {gameMeta?.rules?.map((rule, i) => (
-                                <li key={i}>{rule}</li>
-                            ))}
-                        </ul>
-                        <button className="btn btn-primary" onClick={() => setShowRules(false)}>
-                            GOT IT
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {showExitConfirmation && (
-                <div className="modal-overlay" style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.8)',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    zIndex: 2000
-                }}>
-                    <div className="modal-content" style={{
-                        background: '#2a2a2a',
-                        padding: '30px',
-                        borderRadius: '15px',
-                        maxWidth: '400px',
-                        textAlign: 'center',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                    }}>
-                        <h3 style={{ marginTop: 0 }}>Leave Game?</h3>
-                        <p>Are you sure you want to leave the room?</p>
-                        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
-                            <button className="btn btn-secondary" onClick={() => setShowExitConfirmation(false)}>
-                                Cancel
-                            </button>
-                            <button className="btn btn-primary" onClick={confirmExit} style={{ background: '#ff5555' }}>
-                                Leave
-                            </button>
+        <GameLayout
+            title={displayTitle}
+            leftAction={leftAction}
+            rightAction={rightAction}
+            playScreen={playScreen || children}
+            playerHand={playerHand}
+            overlay={
+                <>
+                    {overlay}
+                    {showRules && (
+                        <div className="modal-overlay" onClick={() => setShowRules(false)} style={{ zIndex: 3000 }}>
+                            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                                <h2>{gameMeta?.name} Rules</h2>
+                                <ul style={{ textAlign: 'left', marginBottom: '20px' }}>
+                                    {gameMeta?.rules?.map((rule, i) => (
+                                        <li key={i} style={{ marginBottom: '8px' }}>{rule}</li>
+                                    ))}
+                                </ul>
+                                <Button variant="primary" onClick={() => setShowRules(false)} style={{ width: '100%' }}>
+                                    GOT IT
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            )}
-        </div>
+                    )}
+
+                    {showExitConfirmation && (
+                        <div className="modal-overlay" style={{ zIndex: 3000 }}>
+                            <div className="modal-content" style={{ textAlign: 'center' }}>
+                                <h3>Leave Game?</h3>
+                                <p style={{ margin: '15px 0', opacity: 0.8 }}>Are you sure you want to leave the room?</p>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
+                                    <Button variant="secondary" onClick={cancelExit}>
+                                        Cancel
+                                    </Button>
+                                    <Button variant="primary" onClick={confirmExit} style={{ background: '#ff5555', border: 'none' }}>
+                                        Leave
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </>
+            }
+        />
     );
 }

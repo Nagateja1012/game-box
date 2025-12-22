@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import LoadingOverlay from '../design-system/LoadingOverlay';
 
-export default function Home({ onJoin, onCreate, onSetName, playerName }) {
+export default function Home({ onJoin, onCreate, onSetName, playerName, isCreatingRoom }) {
     const [joinCode, setJoinCode] = useState('');
     const [isLocked, setIsLocked] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
@@ -76,7 +77,11 @@ export default function Home({ onJoin, onCreate, onSetName, playerName }) {
                         </div>
                     )}
 
-                    <button className="btn btn-secondary" onClick={handleJoin}>
+                    <button
+                        className="btn btn-secondary"
+                        onClick={handleJoin}
+                        disabled={isCreatingRoom}
+                    >
                         JOIN ROOM
                     </button>
 
@@ -84,12 +89,18 @@ export default function Home({ onJoin, onCreate, onSetName, playerName }) {
                     <div className="divider">OR</div>
 
                     <div className="join-section">
-                        <button className="btn btn-primary" onClick={handleCreateClick}>
+                        <button
+                            className="btn btn-primary"
+                            onClick={handleCreateClick}
+                            disabled={isCreatingRoom}
+                        >
                             CREATE ROOM
                         </button>
                     </div>
                 </div>
             </div>
+
+            <LoadingOverlay isActive={isCreatingRoom} />
 
             {showConfirmation && (
                 <div className="modal-overlay" style={{

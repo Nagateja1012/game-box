@@ -4,6 +4,9 @@ import Table from './Table';
 import Hand from './Hand';
 import FutureModal from './FutureModal';
 import './explodingKittens.css';
+import Button from '../../design-system/Button';
+import GameOverOverlay from '../../design-system/GameOverOverlay';
+import GameWrapper from '../../screens/GameWrapper';
 
 export default function ExplodingKittens({ room, me }) {
     const [gameState, setGameState] = useState(null);
@@ -33,7 +36,7 @@ export default function ExplodingKittens({ room, me }) {
         }
     }, [gameState?.showingFutureTo, me.id]);
 
-    if (!gameState) return <div className="ek-game">Loading...</div>;
+    if (!gameState) return <div className="loading-container">Loading...</div>;
 
     const myPlayer = gameState.players.find(p => p.id === me.id);
     const isMyTurn = gameState.currentPlayerId === me.id;
@@ -70,45 +73,78 @@ export default function ExplodingKittens({ room, me }) {
         });
     };
 
+    const isHost = room.players.find(p => p.id === me.id)?.isHost;
+
+    // Game Over Overlay
+    let gameOverNode = null;
+    if (gameState.winner) {
+        const actions = (
+            <>
+                {isHost && (
+                    <Button
+                        variant="primary"
+                        style={{
+                            width: '200px',
+                            border: '2px solid #ff5555',
+                            background: 'rgba(255, 85, 85, 0.2)'
+                        }}
+                        onClick={() => socket.emit('stop_game', { roomId: room.id })}
+                    >
+                        CLOSE GAME
+                    </Button>
+                )}
+
+                <Button
+                    variant="secondary"
+                    style={{ width: '200px' }}
+                    onClick={() => socket.emit('leave_game', { roomId: room.id })}
+                >
+                    BACK TO LOBBY
+                </Button>
+            </>
+        );
+
+        gameOverNode = (
+            <GameOverOverlay
+                winner={gameState.winner}
+                players={gameState.players}
+                actions={actions}
+                scores={{}}
+            />
+        );
+    }
+
     return (
-        <div className="ek-game">
-            <Table
-                gameState={gameState}
-                myId={me.id}
-                onDraw={handleDraw}
-                isMyTurn={isMyTurn}
-            />
+        <GameWrapper
+            room={room}
+            me={me}
+            title="EXPLODING KITTENS"
+            playScreen={
+                <div className="ek-game" style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
+                    <Table
+                        gameState={gameState}
+                        myId={me.id}
+                        onDraw={handleDraw}
+                        isMyTurn={isMyTurn}
+                    />
 
-            <Hand
-                cards={myPlayer?.hand || []}
-                onPlayCard={handlePlayCard}
-                isMyTurn={isMyTurn && !myPlayer?.isEliminated}
-            />
-
-            {showFutureModal && (
-                <FutureModal
-                    cards={gameState.futureCards}
-                    isAlter={gameState.futureCards.length > 0} // Simplified check, ideally check card type played
-                    // Actually, server sends futureCards for both. 
-                    // We need to know if it's Alter or See.
-                    // For now, let's assume if we can reorder, it's Alter. 
-                    // But wait, See Future is just viewing.
-                    // Let's check the last played card? Or server state should indicate?
-                    // For MVP, let's just allow reorder if it's Alter. 
-                    // But how do we know? 
-                    // Let's add a hack: If the user just played Alter Future, they know.
-                    // Better: The modal should probably just always allow reorder but only send if it was Alter.
-                    // Or, we can check if the last action was Alter Future?
-                    // Let's just enable reorder always for now in the UI, but server validates.
-                    // Wait, See Future shouldn't allow dragging.
-                    // Let's default to 'See' unless we know it's 'Alter'.
-                    // Since we don't have that state easily, let's just show 'See' style for now.
-                    // Actually, I'll update server to send 'futureType' in state if I could, but I can't easily change server now without context switch.
-                    // Let's just assume it is reorderable for now.
-                    onClose={handleCloseFuture}
-                    onReorder={handleReorderFuture}
+                    {showFutureModal && (
+                        <FutureModal
+                            cards={gameState.futureCards}
+                            onClose={handleCloseFuture}
+                            onReorder={handleReorderFuture}
+                        />
+                    )}
+                </div>
+            }
+            playerHand={
+                <Hand
+                    cards={myPlayer?.hand || []}
+                    onPlayCard={handlePlayCard}
+                    isMyTurn={isMyTurn && !myPlayer?.isEliminated}
                 />
-            )}
-        </div>
+            }
+            overlay={gameOverNode}
+        />
     );
 }
