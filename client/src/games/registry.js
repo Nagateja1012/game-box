@@ -15,6 +15,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 5,
+        category: 'solo',
         tags: ['dev']
     },
     'UNO': {
@@ -23,7 +24,8 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/ffaa00/ffffff?text=UNO',
         rules: UNO_RULES,
         minPlayers: 2,
-        maxPlayers: 12
+        maxPlayers: 12,
+        category: 'solo'
     },
 
     'SEQUENCE': {
@@ -33,6 +35,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'WHATS_THE_EMOJI': {
@@ -42,6 +45,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 12,
+        category: 'solo',
         tags: ['dev']
     },
     'MAGNETS': {
@@ -51,6 +55,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 4,
+        category: 'solo',
         tags: ['dev']
     },
     'CONNECT_DOTS': {
@@ -60,6 +65,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 4,
+        category: 'solo',
         tags: ['dev']
     },
     'BINGO': {
@@ -69,6 +75,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 20,
+        category: 'solo',
         tags: ['dev']
     },
     'HOUSIE': {
@@ -78,6 +85,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 20,
+        category: 'solo',
         tags: ['dev']
     },
     'UNDERCOVER': {
@@ -87,6 +95,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 3,
         maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'WHO_AM_I': {
@@ -96,6 +105,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 12,
+        category: 'solo',
         tags: ['dev']
     },
     'WEREWOLF': {
@@ -105,6 +115,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 5,
         maxPlayers: 15,
+        category: 'team',
         tags: ['dev']
     },
     'SQUID_GAME': {
@@ -114,6 +125,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 20,
+        category: 'solo',
         tags: ['dev']
     },
     'FUNGI': {
@@ -123,6 +135,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 2,
+        category: 'solo',
         tags: ['dev']
     },
     'CHAIN_REACTION': {
@@ -132,6 +145,7 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 8,
+        category: 'solo',
         tags: ['dev']
     },
     'LEAST_COUNT': {
@@ -141,15 +155,17 @@ export const GAME_METADATA = {
         rules: '',
         minPlayers: 2,
         maxPlayers: 6,
+        category: 'solo',
         tags: ['dev']
     },
     'BLUFF': {
         name: 'Bluff',
         description: 'Card game of deception.',
         image: 'https://placehold.co/600x400/34495e/ffffff?text=Bluff',
-        rules: [],
+        rules: '',
         minPlayers: 3,
         maxPlayers: 10,
+        category: 'solo',
         tags: ['dev']
     }
 };

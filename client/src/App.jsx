@@ -61,6 +61,12 @@ function App() {
       setRoomData(null);
       setCurrentScreen('HOME');
       localStorage.removeItem('room_id');
+
+      // Clear room code from URL
+      const url = new URL(window.location.href);
+      url.searchParams.delete('room');
+      window.history.replaceState({}, '', url.pathname + url.search);
+
       setError('');
     }
 

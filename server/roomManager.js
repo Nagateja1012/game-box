@@ -66,7 +66,7 @@ class RoomManager {
         if (!room) return { error: 'Room not found' };
 
         const GameClass = GAME_REGISTRY[gameId];
-        if (!GameClass) return { error: 'Game not found' };
+        if (!GameClass) return { error: `${gameId} not found` };
 
         try {
             room.game = new GameClass();

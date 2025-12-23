@@ -5,6 +5,8 @@ import { GAME_METADATA } from '../games/registry';
 export default function Lobby({ room, me }) {
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
 
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [categoryFilter, setCategoryFilter] = React.useState('all'); // all, team, single
     const [copied, setCopied] = React.useState(false);
 
     const copyCode = () => {
@@ -17,6 +19,33 @@ export default function Lobby({ room, me }) {
     const handleLeave = () => {
         socket.emit('leave_room', { roomId: room.id });
     };
+
+    const [hoveredGameId, setHoveredGameId] = React.useState(null);
+
+    const handleRandomGame = () => {
+        if (!isHost) return;
+        const playableGames = Object.entries(GAME_METADATA).filter(([id, meta]) => {
+            const isDev = meta.tags?.includes('dev');
+            const isProd = import.meta.env.PROD;
+            return !(isProd && isDev);
+        });
+        const randomId = playableGames[Math.floor(Math.random() * playableGames.length)][0];
+        socket.emit('start_game', { roomId: room.id, gameId: randomId });
+    };
+
+    const filteredGames = Object.entries(GAME_METADATA)
+        .filter(([id, meta]) => {
+            const matchesSearch = meta.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                meta.description.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesCategory = categoryFilter === 'all' || meta.category === categoryFilter;
+            return matchesSearch && matchesCategory;
+        })
+        .sort(([, a], [, b]) => {
+            const aDev = a.tags?.includes('dev');
+            const bDev = b.tags?.includes('dev');
+            if (aDev === bDev) return a.name.localeCompare(b.name);
+            return aDev ? 1 : -1;
+        });
 
     return (
         <div className="screen-container lobby-screen">
@@ -52,48 +81,201 @@ export default function Lobby({ room, me }) {
                 </div>
 
                 <div className="game-selection">
-                    <h3>CHOOSE A GAME</h3>
+                    <div className="game-selection-header" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '20px',
+                        marginBottom: '25px',
+                        padding: '0 10px'
+                    }}>
+                        {/* Left: Filters */}
+                        <div className="category-filters" style={{
+                            display: 'flex',
+                            gap: '12px',
+                            fontSize: '0.7rem',
+                            fontWeight: 'bold',
+                            flex: 1
+                        }}>
+                            {['ALL', 'SOLO', 'TEAM'].map(cat => (
+                                <span
+                                    key={cat}
+                                    onClick={() => setCategoryFilter(cat.toLowerCase())}
+                                    style={{
+                                        cursor: 'pointer',
+                                        opacity: categoryFilter === cat.toLowerCase() ? 1 : 0.4,
+                                        color: categoryFilter === cat.toLowerCase() ? '#06b6d4' : '#fff',
+                                        transition: 'all 0.2s',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        background: categoryFilter === cat.toLowerCase() ? 'rgba(6,182,212,0.1)' : 'transparent',
+                                        border: categoryFilter === cat.toLowerCase() ? '1px solid rgba(6,182,212,0.2)' : '1px solid transparent'
+                                    }}
+                                >
+                                    {cat}
+                                </span>
+                            ))}
+                        </div>
+
+                        {/* Center: Title */}
+                        <h3 style={{
+                            margin: 0,
+                            fontSize: '1.5rem',
+                            letterSpacing: '1px',
+                            background: 'linear-gradient(to bottom, #fff, #bbb)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            flex: 1,
+                            textAlign: 'center',
+                            whiteSpace: 'nowrap'
+                        }}>CHOOSE A GAME</h3>
+
+                        {/* Right: Dice + Search */}
+                        <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            gap: '12px',
+                            flex: 1
+                        }}>
+                            {isHost && (
+                                <button
+                                    onClick={handleRandomGame}
+                                    title="Pick Random Game"
+                                    style={{
+                                        width: '34px',
+                                        height: '34px',
+                                        fontSize: '1.3rem',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: '1px solid rgba(255,255,255,0.15)',
+                                        borderRadius: '10px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                        boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                                        position: 'relative',
+                                        overflow: 'hidden'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1.1) rotate(15deg)';
+                                        e.currentTarget.style.borderColor = '#06b6d4';
+                                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(6,182,212,0.3)';
+                                        e.currentTarget.style.background = 'rgba(6,182,212,0.1)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'scale(1) rotate(0)';
+                                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)';
+                                        e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.2)';
+                                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                                    }}
+                                >
+                                    <span style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>🎲</span>
+                                </button>
+                            )}
+                            <input
+                                type="text"
+                                placeholder="Search..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                style={{
+                                    padding: '8px 14px',
+                                    borderRadius: '18px',
+                                    border: '1px solid rgba(255,255,255,0.15)',
+                                    background: 'rgba(0,0,0,0.4)',
+                                    color: '#fff',
+                                    fontSize: '0.8rem',
+                                    width: '140px',
+                                    outline: 'none',
+                                    transition: 'border-color 0.2s'
+                                }}
+                                onFocus={(e) => e.target.style.borderColor = '#06b6d4'}
+                                onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.15)'}
+                            />
+                        </div>
+                    </div>
+
                     <div className="games-grid">
-                        {Object.entries(GAME_METADATA)
-                            .sort(([, a], [, b]) => {
-                                const aDev = a.tags?.includes('dev');
-                                const bDev = b.tags?.includes('dev');
-                                if (aDev === bDev) return a.name.localeCompare(b.name);
-                                return aDev ? 1 : -1;
-                            })
-                            .map(([id, meta]) => {
+                        {filteredGames.length > 0 ? (
+                            filteredGames.map(([id, meta]) => {
                                 const isDev = meta.tags?.includes('dev');
                                 const isProd = import.meta.env.PROD;
                                 const isComingSoon = isProd && isDev;
+                                const isHovered = hoveredGameId === id;
 
                                 return (
                                     <div
                                         key={id}
                                         className={`game-card ${isComingSoon ? 'coming-soon' : ''}`}
                                         onClick={() => !isComingSoon && isHost && socket.emit('start_game', { roomId: room.id, gameId: id })}
-                                        style={isComingSoon ? { cursor: 'not-allowed', opacity: 0.7 } : {}}
+                                        onMouseEnter={() => !isComingSoon && setHoveredGameId(id)}
+                                        onMouseLeave={() => setHoveredGameId(null)}
+                                        style={{
+                                            cursor: isComingSoon ? 'not-allowed' : 'pointer',
+                                            opacity: isComingSoon ? 0.7 : 1,
+                                            border: isHovered ? '2px solid #06b6d4' : '1px solid rgba(255,255,255,0.08)',
+                                            transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
+                                            boxShadow: isHovered ? '0 10px 25px rgba(0,0,0,0.5), 0 0 15px rgba(6,182,212,0.2)' : 'none',
+                                            position: 'relative',
+                                            overflow: 'hidden',
+                                            borderRadius: '12px',
+                                            background: isHovered ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.02)',
+                                            transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                                        }}
                                     >
                                         <div className="game-image" style={{ backgroundImage: `url(${meta.image})` }}>
                                             {isComingSoon && (
                                                 <div style={{
                                                     width: '100%', height: '100%',
                                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    background: 'rgba(0,0,0,0.6)', color: '#fff', fontWeight: 'bold'
+                                                    background: 'rgba(0,0,0,0.7)', color: '#fff', fontWeight: 'bold',
+                                                    fontSize: '0.75rem', letterSpacing: '1px'
                                                 }}>
                                                     COMING SOON
                                                 </div>
                                             )}
                                         </div>
                                         <div className="game-info">
-                                            <h4>{meta.name}</h4>
-                                            <p>{isComingSoon ? 'Under Development' : meta.description}</p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                <h4 style={{ margin: 0, color: isHovered ? '#06b6d4' : '#fff', transition: 'color 0.2s' }}>{meta.name}</h4>
+                                                {meta.category === 'team' && (
+                                                    <div
+                                                        title="Team Game"
+                                                        style={{
+                                                            width: '10px',
+                                                            height: '10px',
+                                                            background: '#ffaa00',
+                                                            borderRadius: '50%',
+                                                            boxShadow: '0 0 8px rgba(255,170,0,0.8)',
+                                                            flexShrink: 0
+                                                        }}
+                                                    />
+                                                )}
+                                            </div>
+                                            <p style={{ margin: 0, opacity: 0.6, fontSize: '0.8rem' }}>{isComingSoon ? 'Under Development' : meta.description}</p>
                                         </div>
-                                        {!isComingSoon && isHost && <span className="play-tag">PLAY NOW</span>}
+                                        {!isComingSoon && isHost && <span className="play-tag" style={{ opacity: isHovered ? 1 : 0, transition: 'opacity 0.2s' }}>PLAY NOW</span>}
                                     </div>
                                 );
-                            })}
-
-
+                            })
+                        ) : (
+                            <div style={{
+                                gridColumn: '1 / -1',
+                                textAlign: 'center',
+                                padding: '80px 20px',
+                                background: 'rgba(255,255,255,0.02)',
+                                borderRadius: '15px',
+                                border: '1px dashed rgba(255,255,255,0.1)'
+                            }}>
+                                <div style={{ fontSize: '1.2rem', color: '#06b6d4', marginBottom: '8px' }}>
+                                    Game "{searchQuery}" not found
+                                </div>
+                                <div style={{ fontSize: '0.85rem', opacity: 0.5 }}>
+                                    Try searching for another game or clear your filters.
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
