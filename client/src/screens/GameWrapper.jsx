@@ -16,6 +16,42 @@ export default function GameWrapper({ room, me, children, playScreen, playerHand
         toggleRules
     } = useGameActions(room, me);
 
+    const formatRules = (text) => {
+        if (!text) return null;
+
+        return text.split('\n').map((line, i) => {
+            // Headings
+            if (line.startsWith('# ')) {
+                return <h2 key={i} style={{ marginTop: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>{line.slice(2)}</h2>;
+            }
+            if (line.startsWith('## ')) {
+                return <h3 key={i} style={{ marginTop: '15px' }}>{line.slice(3)}</h3>;
+            }
+
+            // Bold text (**text**)
+            const parts = line.split(/(\*\*.*?\*\*)/g);
+            const content = parts.map((part, j) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={j}>{part.slice(2, -2)}</strong>;
+                }
+                return part;
+            });
+
+            // Bullet points
+            if (line.trim().startsWith('- ')) {
+                return (
+                    <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', paddingLeft: '10px' }}>
+                        <span>•</span>
+                        <span>{content}</span>
+                    </div>
+                );
+            }
+
+            // Regular paragraphs
+            return line.trim() === '' ? <br key={i} /> : <p key={i} style={{ marginBottom: '10px' }}>{content}</p>;
+        });
+    };
+
     const gameMeta = GAME_METADATA[room.game.id];
     const displayTitle = title || gameMeta?.name || 'Game';
 
@@ -27,7 +63,7 @@ export default function GameWrapper({ room, me, children, playScreen, playerHand
 
     const rightAction = (
         <Button variant="secondary" onClick={toggleRules} style={{ padding: '8px 20px', fontSize: '0.8rem' }}>
-            INFO
+            RULES
         </Button>
     );
 
@@ -46,14 +82,15 @@ export default function GameWrapper({ room, me, children, playScreen, playerHand
                     {overlay}
                     {showRules && (
                         <div className="modal-overlay" onClick={() => setShowRules(false)} style={{ zIndex: 3000 }}>
-                            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                <h2>{gameMeta?.name} Rules</h2>
-                                <ul style={{ textAlign: 'left', marginBottom: '20px' }}>
-                                    {gameMeta?.rules?.map((rule, i) => (
-                                        <li key={i} style={{ marginBottom: '8px' }}>{rule}</li>
-                                    ))}
-                                </ul>
-                                <Button variant="primary" onClick={() => setShowRules(false)} style={{ width: '100%' }}>
+                            <div className="modal-content" onClick={e => e.stopPropagation()} style={{ width: '90%', maxWidth: '800px', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                    <h2 style={{ margin: 0 }}>{gameMeta?.name} Rules</h2>
+                                    <button onClick={() => setShowRules(false)} style={{ background: 'none', border: 'none', color: '#fff', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
+                                </div>
+                                <div className="rules-scroll-container" style={{ textAlign: 'left', overflowY: 'auto', paddingRight: '15px', flex: 1 }}>
+                                    {formatRules(gameMeta?.rules) || 'No rules available for this game.'}
+                                </div>
+                                <Button variant="primary" onClick={() => setShowRules(false)} style={{ width: '100%', marginTop: '20px' }}>
                                     GOT IT
                                 </Button>
                             </div>

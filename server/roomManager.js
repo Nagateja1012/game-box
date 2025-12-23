@@ -1,10 +1,9 @@
 const UnoGame = require('./games/uno/logic');
-const ExplodingKittens = require('./games/exploding-kittens/logic');
+
 const logger = require('./utils/logger');
 
 const GAME_REGISTRY = {
-    'UNO': UnoGame,
-    'EXPLODING_KITTENS': ExplodingKittens
+    'UNO': UnoGame
 };
 
 class RoomManager {
