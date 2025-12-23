@@ -2,6 +2,16 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const logger = require('./utils/logger');
+
+// Global Exception Handlers
+process.on('uncaughtException', (error) => {
+    logger.error('UNCAUGHT EXCEPTION! Server continuing...', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('UNHANDLED REJECTION! Server continuing...', reason);
+});
 
 const app = express();
 app.use(cors());
@@ -19,10 +29,19 @@ const PORT = process.env.PORT || 3001;
 const socketHandlers = require('./socketHandlers');
 
 io.on('connection', (socket) => {
-    console.log(`User Connected: ${socket.id}`);
+    logger.info(`User Connected: ${socket.id}`);
+
+    socket.on('disconnect', (reason) => {
+        logger.info(`User Disconnected: ${socket.id}`, { reason });
+    });
+
+    socket.on('error', (err) => {
+        logger.error(`Socket Error for ${socket.id}`, err);
+    });
+
     socketHandlers(io, socket);
 });
 
 server.listen(PORT, () => {
-    console.log(`SERVER RUNNING ON PORT ${PORT}`);
+    logger.info(`SERVER RUNNING ON PORT ${PORT}`);
 });

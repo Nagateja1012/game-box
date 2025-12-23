@@ -1,3 +1,5 @@
+const logger = require('../../utils/logger');
+
 class UnoGame {
     constructor() {
         this.id = 'UNO';
@@ -42,6 +44,7 @@ class UnoGame {
 
         // Handle first card effects
         this.handleSpecialCard(firstCard, true);
+        logger.info(`UNO Game Initialized with ${this.players.length} players. Top card: ${firstCard.color} ${firstCard.value}`);
     }
 
     createDeck() {
@@ -91,7 +94,9 @@ class UnoGame {
                 this.deck = this.discardPile;
                 this.discardPile = [topCard];
                 this.shuffleDeck();
+                logger.info('Deck reshuffled from discard pile');
             } else {
+                logger.warn('No cards left in deck or discard pile!');
                 return null; // No cards left
             }
         }
@@ -102,10 +107,16 @@ class UnoGame {
         if (this.gameStatus !== 'PLAYING' && action.type !== 'RESTART_GAME') return false;
 
         const playerIndex = this.players.findIndex(p => p.id === player.id);
-        if (playerIndex === -1) return false;
+        if (playerIndex === -1) {
+            logger.warn(`Player ${player.name} not found in game players list`);
+            return false;
+        }
 
         // Check if it's player's turn (except for Uno shout or Restart)
-        if (playerIndex !== this.turnIndex && action.type !== 'UNO_SHOUT' && action.type !== 'RESTART_GAME') return false;
+        if (playerIndex !== this.turnIndex && action.type !== 'UNO_SHOUT' && action.type !== 'RESTART_GAME') {
+            // logger.warn(`Player ${player.name} attempted action out of turn`);
+            return false;
+        }
 
         switch (action.type) {
             case 'PLAY_CARD':
@@ -119,12 +130,14 @@ class UnoGame {
                     name: player.name,
                     time: Date.now()
                 };
+                logger.info(`UNO Shout by ${player.name}`);
                 return true;
             case 'PASS_TURN':
                 return this.passTurn(playerIndex);
             case 'RESTART_GAME':
                 return this.restartGame(playerIndex);
             default:
+                logger.warn(`Unknown action type: ${action.type}`);
                 return false;
         }
     }
@@ -132,13 +145,19 @@ class UnoGame {
     playCard(playerIndex, cardId, chosenColor) {
         const player = this.players[playerIndex];
         const cardIndex = player.hand.findIndex(c => c.id === cardId);
-        if (cardIndex === -1) return false;
+        if (cardIndex === -1) {
+            logger.warn(`Player ${player.name} tried to play card they don't have: ${cardId}`);
+            return false;
+        }
 
         const card = player.hand[cardIndex];
         const topCard = this.discardPile[this.discardPile.length - 1];
 
         // Validate move
-        if (!this.isValidMove(card, topCard)) return false;
+        if (!this.isValidMove(card, topCard)) {
+            logger.warn(`Invalid move by ${player.name}: ${card.color} ${card.value} on ${topCard.color} ${topCard.value}`);
+            return false;
+        }
 
         // Play card
         player.hand.splice(cardIndex, 1);
@@ -146,11 +165,16 @@ class UnoGame {
 
         // Handle Wild Color Choice
         if (card.color === 'BLACK') {
-            if (!chosenColor) return false; // Must choose color
+            if (!chosenColor) {
+                logger.warn(`Player ${player.name} played Wild but didn't choose color`);
+                return false; // Must choose color
+            }
             this.currentColor = chosenColor;
         } else {
             this.currentColor = card.color;
         }
+
+        logger.info(`Player ${player.name} played ${card.color} ${card.value}`);
 
         // Handle Effects
         const skipTurn = this.handleSpecialCard(card);
@@ -160,6 +184,7 @@ class UnoGame {
             this.winner = player;
             this.gameStatus = 'ENDED';
             this.calculateScores();
+            logger.info(`Game Won by ${player.name}!`);
             return true;
         }
 
@@ -167,6 +192,7 @@ class UnoGame {
         if (player.hand.length === 1 && !player.isUno) {
             player.hand.push(this.drawCard());
             player.hand.push(this.drawCard());
+            logger.info(`Player ${player.name} forgot UNO and drew 2 cards`);
         }
 
         // Reset flags
@@ -229,6 +255,7 @@ class UnoGame {
             for (let i = 0; i < this.drawStack; i++) {
                 player.hand.push(this.drawCard());
             }
+            logger.info(`Player ${player.name} drew ${this.drawStack} cards from stack`);
             this.drawStack = 0;
             this.stackType = null;
             player.hasDrawn = false;
@@ -244,6 +271,7 @@ class UnoGame {
             player.hand.push(card);
             player.hasDrawn = true;
             player.isUno = false; // Reset Uno status on draw
+            logger.info(`Player ${player.name} drew a card`);
             // Do NOT advance turn automatically
         }
         return true;
@@ -257,6 +285,7 @@ class UnoGame {
 
         player.hasDrawn = false;
         this.advanceTurn();
+        logger.info(`Player ${player.name} passed turn`);
         return true;
     }
 
@@ -284,6 +313,7 @@ class UnoGame {
         this.drawStack = 0;
         this.stackType = null;
         this.init(this.players);
+        logger.info('Game Restarted');
         return true;
     }
 
@@ -337,6 +367,53 @@ class UnoGame {
                 return acc;
             }, {})
         };
+    }
+    removePlayer(playerId) {
+        const playerIndex = this.players.findIndex(p => p.id === playerId);
+        if (playerIndex === -1) return false;
+
+        const player = this.players[playerIndex];
+        logger.info(`Removing player ${player.name} from UNO game`);
+
+        // Discard their hand
+        if (player.hand && player.hand.length > 0) {
+            this.discardPile.push(...player.hand);
+        }
+
+        const isLeavingPlayerTurn = (this.turnIndex === playerIndex);
+
+        this.players.splice(playerIndex, 1);
+
+        // Adjust turn index
+        if (this.turnIndex > playerIndex) {
+            this.turnIndex--;
+        } else if (this.turnIndex === playerIndex) {
+            // It was their turn. 
+            // If direction is -1 (counter-clockwise), the "next" player in that order 
+            // is actually at index this.turnIndex - 1.
+            if (this.direction === -1) {
+                this.turnIndex--;
+            }
+            // else direction is 1 (clockwise), index already points to "next" player due to splice.
+
+            // Ensure index stays in bounds
+            if (this.turnIndex >= this.players.length) {
+                this.turnIndex = 0;
+            } else if (this.turnIndex < 0) {
+                this.turnIndex = this.players.length - 1;
+            }
+        }
+
+        // Check win condition (if only 1 player left)
+        if (this.players.length < 2) {
+            this.winner = this.players[0];
+            this.gameStatus = 'ENDED';
+            this.calculateScores();
+            logger.info(`Game ended due to player exit. Winner: ${this.winner?.name}`);
+            return true; // Game Ended
+        }
+
+        return false; // Game continues
     }
 }
 

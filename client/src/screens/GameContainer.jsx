@@ -10,8 +10,6 @@ export default function GameContainer({ room, me }) {
     }
 
     return (
-        <GameWrapper room={room} me={me}>
-            <GameComponent room={room} me={me} />
-        </GameWrapper>
+        <GameComponent room={room} me={me} />
     );
 }
