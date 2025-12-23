@@ -1,4 +1,4 @@
-import Uno from './uno';
+import Uno from './uno/index';
 import { UNO_RULES } from './uno/rules';
 
 
