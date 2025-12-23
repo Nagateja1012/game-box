@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+const logger = require('../../utils/logger');
 
 class UnoGame {
     constructor() {
@@ -373,19 +373,35 @@ class UnoGame {
         if (playerIndex === -1) return false;
 
         const player = this.players[playerIndex];
+        logger.info(`Removing player ${player.name} from UNO game`);
 
-        // Return cards to discard pile (optional, but keeps card count consistent)
-        // Or just discard them.
-        this.discardPile.push(...player.hand);
+        // Discard their hand
+        if (player.hand && player.hand.length > 0) {
+            this.discardPile.push(...player.hand);
+        }
+
+        const isLeavingPlayerTurn = (this.turnIndex === playerIndex);
 
         this.players.splice(playerIndex, 1);
 
         // Adjust turn index
-        if (playerIndex < this.turnIndex) {
+        if (this.turnIndex > playerIndex) {
             this.turnIndex--;
-        }
-        if (this.turnIndex >= this.players.length) {
-            this.turnIndex = 0;
+        } else if (this.turnIndex === playerIndex) {
+            // It was their turn. 
+            // If direction is -1 (counter-clockwise), the "next" player in that order 
+            // is actually at index this.turnIndex - 1.
+            if (this.direction === -1) {
+                this.turnIndex--;
+            }
+            // else direction is 1 (clockwise), index already points to "next" player due to splice.
+
+            // Ensure index stays in bounds
+            if (this.turnIndex >= this.players.length) {
+                this.turnIndex = 0;
+            } else if (this.turnIndex < 0) {
+                this.turnIndex = this.players.length - 1;
+            }
         }
 
         // Check win condition (if only 1 player left)
@@ -393,6 +409,7 @@ class UnoGame {
             this.winner = this.players[0];
             this.gameStatus = 'ENDED';
             this.calculateScores();
+            logger.info(`Game ended due to player exit. Winner: ${this.winner?.name}`);
             return true; // Game Ended
         }
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import Card from './Card';
+import PlayerBubble from '../../design-system/PlayerBubble';
 
 export default function Table({
     players,
@@ -32,7 +33,7 @@ export default function Table({
 
     React.useEffect(() => {
         // Hide after 5 seconds on mount
-        const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+        const timer = setTimeout(() => setShowTurnIndicator(false), 1000);
         return () => clearTimeout(timer);
     }, []);
 
@@ -40,121 +41,118 @@ export default function Table({
         if (turnIndex !== prevTurnIndex.current) {
             setShowTurnIndicator(true);
             prevTurnIndex.current = turnIndex;
-            const timer = setTimeout(() => setShowTurnIndicator(false), 3000);
+            const timer = setTimeout(() => setShowTurnIndicator(false), 1000);
             return () => clearTimeout(timer);
         }
     }, [turnIndex]);
 
     return (
-        <div className="uno-table">
-            <div className="opponents-ring">
+        <div className="uno-table" style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <div className="opponents-ring" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
                 {orderedOpponents.map((player, index) => {
                     const total = orderedOpponents.length;
-                    // Angle: Start from -90 (top) and go around
-                    // If 1 opponent, top. If 2, top-left, top-right?
-                    // Let's distribute evenly from angle 180 (left) to 0 (right) via top (-90)
-                    // Or just full circle 0 to 360, but skip bottom area
-                    // Let's try: Start at 200deg, end at 340deg? No.
-                    // Let's place them on a circle.
-                    // "Me" is at 90deg (bottom).
-                    // So we distribute others from approx 120deg to 60deg (counter clockwise)
 
-                    const angleStep = 240 / (total + 1); // Spread over 240 degrees (leaving 120 for bottom)
-                    const startAngle = 150; // Start a bit up from left bottom
-                    const angle = startAngle + (index + 1) * angleStep; // Clockwise
+                    // Elliptical distribution
+                    // We want to distribute them from ~140deg to ~400deg (clockwise)
+                    // skipping the bottom center (90deg +/- 40)
 
-                    // Convert to radians
+                    const startAngle = 140;
+                    const endAngle = 400;
+                    const angleRange = endAngle - startAngle;
+
+                    const angleStep = angleRange / (total > 1 ? total - 1 : 1);
+                    const angle = total === 1 ? 270 : startAngle + index * angleStep;
+
+                    // Radian conversion
                     const rad = (angle * Math.PI) / 180;
-                    const radius = 200; // Reduced from 250px to ensure visibility
-                    const x = Math.cos(rad) * radius;
-                    const y = Math.sin(rad) * radius;
 
-                    // Adjust for center
+                    // Dynamic radii based on common screen proportions
+                    const xRadius = Math.min(window.innerWidth * 0.42, 600);
+                    const yRadius = Math.min(window.innerHeight * 0.28, 240);
+
+                    const x = Math.cos(rad) * xRadius;
+                    const y = Math.sin(rad) * yRadius;
+
                     const style = {
-                        transform: `translate(${x}px, ${y}px)`
+                        position: 'absolute',
+                        left: '50%',
+                        top: '50%', // Center vertically within the play-screen slot
+                        transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`,
+                        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                        zIndex: 100
                     };
 
                     const isTurn = players[turnIndex].id === player.id;
 
                     return (
-                        <div
+                        <PlayerBubble
                             key={player.id}
-                            className={`opponent ${isTurn ? 'active' : ''}`}
-                            style={{
-                                left: '50%',
-                                top: '40%', // Center of ring
-                                ...style
-                            }}
-                        >
-                            <div className="opponent-avatar">
-                                {player.name[0].toUpperCase()}
-                            </div>
-                            <div className="opponent-name">{player.name}</div>
-                            <div className="opponent-cards">
-                                🎴 {player.cardCount}
-                            </div>
-                            {player.isUno && <div className="uno-tag">UNO!</div>}
-                        </div>
+                            player={player}
+                            isTurn={isTurn}
+                            style={style}
+                            stats={[{ icon: '🎴', value: player.cardCount }]}
+                            tags={player.isUno ? ['UNO!'] : []}
+                        />
                     );
                 })}
             </div>
 
-            <div className="center-area" style={{ position: 'relative' }}>
-
-                <div className="deck-pile" onClick={onDraw}>
-                    <Card size="normal" /> {/* Back of card */}
-                </div>
-                <div className="discard-pile">
-                    {topCard && <Card key={topCard.id} card={topCard} size="normal" />}
-                    {/* Show current color indicator if Wild */}
-                    {topCard?.color === 'BLACK' && currentColor && (
-                        <div
-                            className="color-indicator"
-                            style={{
-                                position: 'absolute',
-                                bottom: -20,
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                width: 20,
-                                height: 20,
-                                borderRadius: '50%',
-                                background: currentColor.toLowerCase() === 'red' ? '#ff5555' :
-                                    currentColor.toLowerCase() === 'blue' ? '#5555ff' :
-                                        currentColor.toLowerCase() === 'green' ? '#55ff55' :
-                                            '#ffaa00',
-                                border: '2px solid white'
-                            }}
-                        />
-                    )}
-
-                </div>
+            <div className="center-area" style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                zIndex: 5
+            }}>
                 {showTurnIndicator && (
-                    <div className="turn-indicator" style={{
+                    <div className="turn-indicator-modern" style={{
+                        background: players[turnIndex].id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.8)',
                         position: 'absolute',
-                        bottom: '100px', // Closer to the cards (10px gap)
-                        left: '50%',
-                        top: '110%',
-                        transform: 'translateX(-50%)',
-                        background: 'rgba(0, 0, 0, 0.6)', // Darker background
-                        padding: '10px 30px', // More padding
-                        borderRadius: '50px', // Fully rounded
-                        whiteSpace: 'pre-wrap', // Preserve whitespace but wrap
-                        width: 'max-content', // Hug content
-                        maxWidth: '80vw', // Max width
-                        textAlign: 'center',
-                        zIndex: 10,
-                        fontWeight: 'bold',
-                        fontSize: '1.2rem', // Larger text
-                        border: '1px solid rgba(255,255,255,0.4)',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
-                        animation: 'fadeIn 0.3s ease-out',
-                        display: 'flex', // Ensure proper box model
-                        alignItems: 'center',
-                        justifyContent: 'center'
+                        top: '-50px',
+                        padding: '8px 25px',
+                        borderRadius: '50px',
+                        whiteSpace: 'nowrap',
+                        fontWeight: '800',
+                        fontSize: '1rem',
+                        border: players[turnIndex].id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.3)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                        animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     }}>
-                        {players[turnIndex].name}'s Turn
+                        {players[turnIndex].id === me.id ? 'YOUR TURN' : `${players[turnIndex].name.toUpperCase()}'S TURN`}
                     </div>
                 )}
+
+                <div className="piles-container" style={{ display: 'flex', gap: '50px', alignItems: 'center' }}>
+                    <div className="deck-pile" onClick={onDraw} style={{ cursor: 'pointer' }}>
+                        <Card size="normal" />
+                    </div>
+                    <div className="discard-pile" style={{ position: 'relative' }}>
+                        {topCard && <Card key={topCard.id} card={topCard} size="normal" />}
+                        {topCard?.color === 'BLACK' && currentColor && (
+                            <div
+                                className="color-indicator"
+                                style={{
+                                    position: 'absolute',
+                                    bottom: -25,
+                                    left: '50%',
+                                    transform: 'translateX(-50%)',
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    background: currentColor.toLowerCase() === 'red' ? '#ff4d4d' :
+                                        currentColor.toLowerCase() === 'blue' ? '#4d4dff' :
+                                            currentColor.toLowerCase() === 'green' ? '#4dff4d' :
+                                                '#ffcc00',
+                                    border: '3px solid white',
+                                    boxShadow: '0 0 10px rgba(0,0,0,0.5)'
+                                }}
+                            />
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
