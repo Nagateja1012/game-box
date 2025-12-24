@@ -603,3 +603,38 @@ input:focus {
     transform: translateX(100%);
   }
 }
+
+/* Restoring Session Screen */
+.loader {
+  width: 48px;
+  height: 48px;
+  border: 5px solid rgba(255, 255, 255, 0.1);
+  border-bottom-color: #06b6d4;
+  border-radius: 50%;
+  display: inline-block;
+  box-sizing: border-box;
+  animation: rotation 1s linear infinite;
+}
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.restoring-screen {
+  background: var(--bg-dark);
+  text-align: center;
+}
+
+.restoring-screen h2 {
+  margin: 0;
+  background: linear-gradient(to bottom, #fff, #bbb);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 1px;
+}

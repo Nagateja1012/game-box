@@ -9,7 +9,10 @@ import './App.css';
 
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);
-  const [currentScreen, setCurrentScreen] = useState('HOME'); // HOME, LOBBY, GAME
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    const savedRoomId = localStorage.getItem('room_id');
+    return savedRoomId ? 'RESTORING' : 'HOME';
+  });
   const [playerData, setPlayerData] = useState(() => {
     const savedName = localStorage.getItem('player_name') || '';
     const savedUserId = localStorage.getItem('user_id') || `user_${Math.random().toString(36).substr(2, 9)}`;
@@ -98,6 +101,22 @@ function App() {
     if (savedRoomId && playerData.name) {
       console.log("Attempting to reconnect to room:", savedRoomId);
       socket.emit('join_room', { roomId: savedRoomId, playerName: playerData.name, userId: playerData.userId });
+
+      // Safety fallback: if no room_updated after 5 seconds, go home
+      const timer = setTimeout(() => {
+        setCurrentScreen(prev => prev === 'RESTORING' ? 'HOME' : prev);
+      }, 5000);
+      return () => {
+        clearTimeout(timer);
+        socket.off('connect', onConnect);
+        socket.off('disconnect', onDisconnect);
+        socket.off('room_created', onRoomCreated);
+        socket.off('room_updated', onRoomUpdated);
+        socket.off('left_room', onLeftRoom);
+        socket.on('error', onError);
+        socket.off('connect_error', onConnectError);
+        socket.disconnect();
+      };
     }
 
     return () => {
@@ -143,6 +162,21 @@ function App() {
     <ErrorBoundary>
       <div className={`app-container ${currentScreen !== 'GAME' ? 'standard-layout' : ''}`}>
         {error && <div className="error-banner">{error}</div>}
+
+        {currentScreen === 'RESTORING' && (
+          <div className="screen-container restoring-screen" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+            <div className="loader" style={{ marginBottom: '20px' }}></div>
+            <h2>Restoring Session...</h2>
+            <p style={{ opacity: 0.7 }}>Reconnecting you to your game room.</p>
+            <button
+              className="btn btn-secondary"
+              style={{ marginTop: '30px', fontSize: '0.8rem' }}
+              onClick={() => setCurrentScreen('HOME')}
+            >
+              Back to Home
+            </button>
+          </div>
+        )}
 
         {currentScreen === 'HOME' && (
           <Home
