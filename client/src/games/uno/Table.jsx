@@ -12,6 +12,7 @@ export default function Table({
     onDraw,
     currentColor,
     turnStartTime,
+    roomId,
     turnDuration = 20000 // Default 30 seconds
 }) {
     // Filter out me from players to show opponents
@@ -82,7 +83,8 @@ export default function Table({
                         top: '50%',
                         transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`,
                         transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                        zIndex: 100
+                        zIndex: 100,
+                        pointerEvents: 'auto'
                     };
 
                     const isTurn = players[turnIndex]?.id === player.id;
@@ -96,6 +98,8 @@ export default function Table({
                         >
                             <PlayerBubble
                                 player={player}
+                                isMe={false}
+                                roomId={roomId}
                                 isTurn={isTurn}
                                 stats={[{ icon: '🎴', value: player.cardCount }]}
                                 tags={player.isUno ? ['UNO!'] : []}
@@ -111,7 +115,8 @@ export default function Table({
                         bottom: '20px',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        zIndex: 150
+                        zIndex: 150,
+                        pointerEvents: 'auto'
                     }}>
                         {(() => {
                             const myPlayer = players.find(p => p.id === me.id);
@@ -125,6 +130,8 @@ export default function Table({
                                 >
                                     <PlayerBubble
                                         player={myPlayer}
+                                        isMe={true}
+                                        roomId={roomId}
                                         isTurn={isMyTurn}
                                         stats={[{ icon: '🎴', value: myPlayer.cardCount }]}
                                         tags={myPlayer.isUno ? ['UNO!'] : []}

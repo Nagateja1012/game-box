@@ -83,6 +83,15 @@ function setupSocketHandlers(io, socket) {
         }
     });
 
+    // Send Emote
+    socket.on('send_emote', ({ roomId, emote }) => {
+        try {
+            io.to(roomId).emit('player_emote', { playerId: socket.id, emote });
+        } catch (error) {
+            logger.error(`Error in send_emote`, error);
+        }
+    });
+
     // Stop Game
     socket.on('stop_game', ({ roomId }) => {
         try {

@@ -188,6 +188,7 @@ export default function Uno({ room, me }) {
                         onDraw={handleDraw}
                         currentColor={gameState.currentColor}
                         turnStartTime={gameState.turnStartTime}
+                        roomId={room.id}
                         turnDuration={gameState.turnDuration}
                     />
 
