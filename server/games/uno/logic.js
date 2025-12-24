@@ -15,6 +15,13 @@ class UnoGame {
         this.stackType = null; // 'DRAW_TWO' or 'WILD_DRAW_FOUR'
         this.scores = {};
         this.lastUnoShout = null; // { playerId, name, time }
+
+        // Turn timer configuration
+        this.turnDuration = 22000; // 30 seconds per turn
+        this.turnStartTime = null;
+        this.turnTimer = null;
+        this.onTurnTimeout = null; // Callback for when turn times out
+        this.onStateChange = null; // Callback for when game state changes internally
     }
 
     // Initialize game with players
@@ -45,6 +52,9 @@ class UnoGame {
         // Handle first card effects
         this.handleSpecialCard(firstCard, true);
         logger.info(`UNO Game Initialized with ${this.players.length} players. Top card: ${firstCard.color} ${firstCard.value}`);
+
+        // Start turn timer
+        this.startTurnTimer();
     }
 
     createDeck() {
@@ -142,6 +152,46 @@ class UnoGame {
         }
     }
 
+    startTurnTimer() {
+        // Clear any existing timer
+        this.clearTurnTimer();
+
+        if (this.gameStatus !== 'PLAYING') return;
+
+        this.turnStartTime = Date.now();
+
+        this.turnTimer = setTimeout(() => {
+            const currentPlayer = this.players[this.turnIndex];
+            logger.info(`Turn timeout for player ${currentPlayer.name}`);
+
+            // Auto-pass or auto-draw then pass
+            if (currentPlayer.hasDrawn || this.drawStack > 0) {
+                // If already drawn or facing a stack, just pass
+                this.passTurn(this.turnIndex);
+            } else {
+                // Draw a card first, then pass
+                this.playerDrawCard(this.turnIndex);
+                this.passTurn(this.turnIndex);
+            }
+
+            // Notify via callback if set
+            if (this.onTurnTimeout) {
+                this.onTurnTimeout();
+            }
+            if (this.onStateChange) {
+                this.onStateChange();
+            }
+        }, this.turnDuration);
+    }
+
+    clearTurnTimer() {
+        if (this.turnTimer) {
+            clearTimeout(this.turnTimer);
+            this.turnTimer = null;
+        }
+        this.turnStartTime = null;
+    }
+
     playCard(playerIndex, cardId, chosenColor) {
         const player = this.players[playerIndex];
         const cardIndex = player.hand.findIndex(c => c.id === cardId);
@@ -156,6 +206,12 @@ class UnoGame {
         // Validate move
         if (!this.isValidMove(card, topCard)) {
             logger.warn(`Invalid move by ${player.name}: ${card.color} ${card.value} on ${topCard.color} ${topCard.value}`);
+            return false;
+        }
+
+        // Validate House Rule: Cannot win with a Wild or Wild Draw Four card
+        if (player.hand.length === 1 && (card.type === 'WILD' || card.type === 'WILD_DRAW_FOUR')) {
+            logger.warn(`House Rule Violation: ${player.name} tried to end with a ${card.type} card`);
             return false;
         }
 
@@ -183,6 +239,7 @@ class UnoGame {
         if (player.hand.length === 0) {
             this.winner = player;
             this.gameStatus = 'ENDED';
+            this.clearTurnTimer();
             this.calculateScores();
             logger.info(`Game Won by ${player.name}!`);
             return true;
@@ -201,6 +258,7 @@ class UnoGame {
 
         // Next turn
         this.advanceTurn(skipTurn);
+        this.startTurnTimer(); // Restart timer for next player
         return true;
     }
 
@@ -260,6 +318,7 @@ class UnoGame {
             this.stackType = null;
             player.hasDrawn = false;
             this.advanceTurn();
+            this.startTurnTimer(); // Restart timer for next player
             return true;
         }
 
@@ -285,6 +344,7 @@ class UnoGame {
 
         player.hasDrawn = false;
         this.advanceTurn();
+        this.startTurnTimer(); // Restart timer for next player
         logger.info(`Player ${player.name} passed turn`);
         return true;
     }
@@ -312,6 +372,7 @@ class UnoGame {
         this.winner = null;
         this.drawStack = 0;
         this.stackType = null;
+        this.clearTurnTimer();
         this.init(this.players);
         logger.info('Game Restarted');
         return true;
@@ -329,9 +390,14 @@ class UnoGame {
         if (skip) {
             this.turnIndex = this.getNextPlayerIndex();
         }
+
+        if (this.onStateChange) {
+            this.onStateChange();
+        }
     }
 
     getState() {
+        // Explicitly return only serializable data - do NOT include turnTimer (it has circular refs)
         return {
             gameStatus: this.gameStatus,
             players: this.players.map(p => ({
@@ -346,22 +412,14 @@ class UnoGame {
             currentColor: this.currentColor,
             direction: this.direction,
             turnIndex: this.turnIndex,
-            turnIndex: this.turnIndex,
             winner: this.winner,
             scores: this.scores,
             lastUnoShout: this.lastUnoShout,
             drawStack: this.drawStack,
-            // Send full hand only to the specific player (handled by UI filtering or socket room logic?)
-            // Actually, roomManager broadcasts to everyone.
-            // We need to be careful not to send everyone's hand to everyone.
-            // But for this simple app, we might send it all and filter on client, OR better:
-            // We can't easily send different states to different people with simple io.to(room).emit
-            // So we will send "hands" as just counts in `players` array above.
-            // And we need a way to send "my hand".
-            // The client will have to request "my hand" or we send a separate event?
-            // Or we just send everyone's hand and trust the client (INSECURE but fast for prototype).
-            // Let's send everyone's hand for now to be fast, but maybe mask it?
-            // No, let's just send `hands` map: { playerId: [cards] }
+            // Turn timer info for client synchronization (primitives only, no timer object)
+            turnStartTime: this.turnStartTime,
+            turnDuration: this.turnDuration,
+            // Send hands map: { playerId: [cards] }
             hands: this.players.reduce((acc, p) => {
                 acc[p.id] = p.hand;
                 return acc;
@@ -408,13 +466,18 @@ class UnoGame {
         if (this.players.length < 2) {
             this.winner = this.players[0];
             this.gameStatus = 'ENDED';
+            this.clearTurnTimer();
             this.calculateScores();
             logger.info(`Game ended due to player exit. Winner: ${this.winner?.name}`);
             return true; // Game Ended
         }
+
+        // Restart turn timer for the new current player
+        this.startTurnTimer();
 
         return false; // Game continues
     }
 }
 
 module.exports = UnoGame;
+

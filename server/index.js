@@ -28,6 +28,9 @@ const PORT = process.env.PORT || 3001;
 
 const socketHandlers = require('./socketHandlers');
 
+// Initialize socket handlers (for async events)
+socketHandlers.init(io);
+
 io.on('connection', (socket) => {
     logger.info(`User Connected: ${socket.id}`);
 
@@ -39,7 +42,7 @@ io.on('connection', (socket) => {
         logger.error(`Socket Error for ${socket.id}`, err);
     });
 
-    socketHandlers(io, socket);
+    socketHandlers.setupSocketHandlers(io, socket);
 });
 
 server.listen(PORT, () => {

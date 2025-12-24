@@ -41,6 +41,12 @@ function App() {
     }
 
     function onRoomUpdated(room) {
+      // Add null check to prevent errors
+      if (!room) {
+        console.warn('Received null/undefined room in room_updated event');
+        return;
+      }
+
       setRoomData(room);
       setIsCreatingRoom(false); // Done loading
       // Save room ID for reconnection
