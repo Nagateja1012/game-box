@@ -101,11 +101,11 @@ class RoomManager {
         return { room };
     }
 
-    leaveGame(roomId, playerId) {
+    leaveGame(roomId, playerId, userId) {
         const room = this.rooms.get(roomId);
         if (!room) return { error: 'Room not found' };
 
-        const player = room.players.find(p => p.id === playerId);
+        const player = room.players.find(p => p.id === playerId || (userId && p.userId === userId));
         if (!player) return { error: 'Player not found' };
 
         player.status = 'WAITING';
@@ -114,7 +114,7 @@ class RoomManager {
         if (room.game && room.status === 'PLAYING') {
             // Remove from active game logic
             if (room.game.removePlayer) {
-                const gameEnded = room.game.removePlayer(playerId);
+                const gameEnded = room.game.removePlayer(player.id);
                 if (gameEnded) {
                     // Game is naturally over (e.g. 1 player remains)
                     // We keep room.status as 'PLAYING' so others can see the winner overlay.
@@ -160,20 +160,21 @@ class RoomManager {
         return null;
     }
 
-    removePlayer(socketId) {
+    removePlayer(socketId, userId) {
         // Find room with this player
         for (const [roomId, room] of this.rooms.entries()) {
-            const playerIndex = room.players.findIndex(p => p.id === socketId);
+            const playerIndex = room.players.findIndex(p => p.id === socketId || (userId && p.userId === userId));
             if (playerIndex !== -1) {
                 const player = room.players[playerIndex];
                 const wasHost = player.isHost;
+                const actualSocketId = player.id;
 
                 room.players.splice(playerIndex, 1);
-                logger.info(`Player ${player.name} (${socketId}) removed from room ${roomId}`);
+                logger.info(`Player ${player.name} (${actualSocketId}) removed from room ${roomId}`);
 
                 // If in game, remove them from game logic too
                 if (room.game && room.status === 'PLAYING') {
-                    room.game.removePlayer(socketId);
+                    room.game.removePlayer(actualSocketId);
                     room.gameState = room.game.getState();
                 }
 

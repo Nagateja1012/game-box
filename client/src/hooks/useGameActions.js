@@ -8,7 +8,7 @@ export function useGameActions(room, me) {
     const handleExit = () => setShowExitConfirmation(true);
     const cancelExit = () => setShowExitConfirmation(false);
     const confirmExit = () => {
-        socket.emit('leave_game', { roomId: room.id });
+        socket.emit('leave_game', { roomId: room.id, userId: me.userId });
         setShowExitConfirmation(false);
     };
 

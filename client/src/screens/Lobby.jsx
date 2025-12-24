@@ -17,7 +17,7 @@ export default function Lobby({ room, me }) {
     };
 
     const handleLeave = () => {
-        socket.emit('leave_room', { roomId: room.id });
+        socket.emit('leave_room', { roomId: room.id, userId: me.userId });
     };
 
     const [hoveredGameId, setHoveredGameId] = React.useState(null);

@@ -145,7 +145,7 @@ export default function Uno({ room, me }) {
                 <Button
                     variant="secondary"
                     style={{ width: '200px' }}
-                    onClick={() => socket.emit('leave_game', { roomId: room.id })}
+                    onClick={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
                 >
                     BACK TO LOBBY
                 </Button>

@@ -94,10 +94,10 @@ module.exports = (io, socket) => {
     });
 
     // Leave Game (Return to Lobby)
-    socket.on('leave_game', ({ roomId }) => {
+    socket.on('leave_game', ({ roomId, userId }) => {
         try {
-            logger.info(`Player ${socket.id} leaving game in room ${roomId}`);
-            const result = roomManager.leaveGame(roomId, socket.id);
+            logger.info(`Player ${socket.id} (user: ${userId}) leaving game in room ${roomId}`);
+            const result = roomManager.leaveGame(roomId, socket.id, userId);
 
             if (result.error) {
                 socket.emit('error', result.error);
@@ -112,10 +112,10 @@ module.exports = (io, socket) => {
     });
 
     // Leave Room
-    socket.on('leave_room', ({ roomId }) => {
+    socket.on('leave_room', ({ roomId, userId }) => {
         try {
-            logger.info(`Player ${socket.id} leaving room ${roomId}`);
-            const result = roomManager.removePlayer(socket.id);
+            logger.info(`Player ${socket.id} (user: ${userId}) leaving room ${roomId}`);
+            const result = roomManager.removePlayer(socket.id, userId);
 
             socket.leave(roomId);
             socket.emit('left_room'); // Ack to sender
