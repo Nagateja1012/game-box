@@ -1,7 +1,15 @@
 const roomManager = require('./roomManager');
 const logger = require('./utils/logger');
 
-module.exports = (io, socket) => {
+function init(io) {
+    // Listen for async room updates from roomManager (e.g., timeout events)
+    roomManager.on('room_updated', (roomId, room) => {
+        logger.info(`Async room update for room ${roomId}`);
+        io.to(roomId).emit('room_updated', room);
+    });
+}
+
+function setupSocketHandlers(io, socket) {
     // Join Room
     socket.on('join_room', ({ roomId, playerName, userId }) => {
         try {
@@ -30,7 +38,7 @@ module.exports = (io, socket) => {
             socket.emit('room_created', roomId);
 
             const room = roomManager.getRoom(roomId);
-            socket.emit('room_updated', room);
+            socket.emit('room_updated', roomManager.getSerializableRoom(room));
             logger.info(`Room created successfully`, { roomId });
         } catch (error) {
             logger.error(`Error in create_room`, error);
@@ -143,4 +151,6 @@ module.exports = (io, socket) => {
             logger.error(`Error in disconnect handler`, error);
         }
     });
-};
+}
+
+module.exports = { init, setupSocketHandlers };

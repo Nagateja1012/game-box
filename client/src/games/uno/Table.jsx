@@ -1,6 +1,7 @@
 import React from 'react';
 import Card from './Card';
 import PlayerBubble from '../../design-system/PlayerBubble';
+import TurnTimer from '../../design-system/TurnTimer';
 
 export default function Table({
     players,
@@ -9,7 +10,9 @@ export default function Table({
     direction,
     turnIndex,
     onDraw,
-    currentColor
+    currentColor,
+    turnStartTime,
+    turnDuration = 30000 // Default 30 seconds
 }) {
     // Filter out me from players to show opponents
     const opponents = players.filter(p => p.id !== me.id);
@@ -82,17 +85,36 @@ export default function Table({
                         zIndex: 100
                     };
 
-                    const isTurn = players[turnIndex].id === player.id;
+                    const isTurn = players[turnIndex]?.id === player.id;
+
+                    // Calculate initial time remaining based on server's turn start time
+                    let initialTimeRemaining = turnDuration;
+                    if (isTurn && turnStartTime) {
+                        const elapsed = Date.now() - turnStartTime;
+                        initialTimeRemaining = Math.max(0, turnDuration - elapsed);
+                    }
 
                     return (
-                        <PlayerBubble
+                        <TurnTimer
                             key={player.id}
-                            player={player}
-                            isTurn={isTurn}
-                            style={style}
-                            stats={[{ icon: '🎴', value: player.cardCount }]}
-                            tags={player.isUno ? ['UNO!'] : []}
-                        />
+                            isActive={isTurn}
+                            turnDuration={initialTimeRemaining} // Use calculated remaining time
+                            warningThreshold={10000} // 10 seconds
+                            criticalThreshold={5000} // 5 seconds
+                            onTimeout={() => {
+                                // Timer expired - server will handle auto-pass
+                                console.log(`Turn timeout for player ${player.name}`);
+                            }}
+                        >
+                            <PlayerBubble
+                                key={player.id}
+                                player={player}
+                                isTurn={isTurn}
+                                style={style}
+                                stats={[{ icon: '🎴', value: player.cardCount }]}
+                                tags={player.isUno ? ['UNO!'] : []}
+                            />
+                        </TurnTimer>
                     );
                 })}
             </div>
@@ -109,7 +131,7 @@ export default function Table({
             }}>
                 {showTurnIndicator && (
                     <div className="turn-indicator-modern" style={{
-                        background: players[turnIndex].id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.8)',
+                        background: players[turnIndex]?.id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.8)',
                         position: 'absolute',
                         top: '-50px',
                         padding: '8px 25px',
@@ -117,11 +139,11 @@ export default function Table({
                         whiteSpace: 'nowrap',
                         fontWeight: '800',
                         fontSize: '1rem',
-                        border: players[turnIndex].id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.3)',
+                        border: players[turnIndex]?.id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.3)',
                         boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
                         animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                     }}>
-                        {players[turnIndex].id === me.id ? 'YOUR TURN' : `${players[turnIndex].name.toUpperCase()}'S TURN`}
+                        {players[turnIndex]?.id === me.id ? 'YOUR TURN' : `${players[turnIndex]?.name.toUpperCase()}'S TURN`}
                     </div>
                 )}
 

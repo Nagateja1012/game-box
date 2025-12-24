@@ -1,3 +1,4 @@
+const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
 
 const logger = require('./utils/logger');
@@ -6,9 +7,12 @@ const GAME_REGISTRY = {
     'UNO': UnoGame
 };
 
-class RoomManager {
+class RoomManager extends EventEmitter {
     constructor() {
+        super();
         this.rooms = new Map(); // roomId -> { players: [], gameState: {}, ... }
+        this.disconnectionTimers = new Map(); // userId -> timeoutId
+        this.DISCONNECT_TIMEOUT = 30000; // 30 seconds
     }
 
     createRoom(hostId, hostName, userId) {
@@ -38,6 +42,13 @@ class RoomManager {
             existingPlayer.connected = true;
             logger.info(`Player ${playerName} (${userId}) reconnected to room ${roomId} with new socket ${playerId}`);
 
+            // Clear disconnection timer if it exists
+            if (this.disconnectionTimers.has(userId)) {
+                clearTimeout(this.disconnectionTimers.get(userId));
+                this.disconnectionTimers.delete(userId);
+                logger.info(`Disconnection timer cleared for ${playerName} (${userId})`);
+            }
+
             // Update active game if exists
             if (room.game && room.game.players) {
                 const gamePlayer = room.game.players.find(p => p.id === oldSocketId);
@@ -54,11 +65,23 @@ class RoomManager {
             logger.info(`Player ${playerName} (${playerId}) joined room ${roomId}`);
         }
 
-        return { room };
+        return { room: this.getSerializableRoom(room) };
     }
 
     getRoom(roomId) {
         return this.rooms.get(roomId);
+    }
+
+
+    getSerializableRoom(room) {
+        if (!room) return null;
+        return {
+            id: room.id,
+            players: room.players,
+            gameState: room.gameState,
+            status: room.status,
+
+        };
     }
 
     startGame(roomId, gameId) {
@@ -82,7 +105,7 @@ class RoomManager {
             return { error: 'Failed to start game' };
         }
 
-        return { room };
+        return { room: this.getSerializableRoom(room) };
     }
 
     stopGame(roomId, hostId) {
@@ -98,7 +121,7 @@ class RoomManager {
         room.players.forEach(p => p.status = 'WAITING');
         logger.info(`Game stopped in room ${roomId} by host`);
 
-        return { room };
+        return { room: this.getSerializableRoom(room) };
     }
 
     leaveGame(roomId, playerId, userId) {
@@ -125,7 +148,7 @@ class RoomManager {
             }
         }
 
-        return { room };
+        return { room: this.getSerializableRoom(room) };
     }
 
     handleGameAction(roomId, playerId, action) {
@@ -139,7 +162,7 @@ class RoomManager {
             const changed = room.game.handleAction(action, player);
             if (changed) {
                 room.gameState = room.game.getState();
-                return { room };
+                return { room: this.getSerializableRoom(room) };
             }
         } catch (error) {
             logger.error(`Error handling game action in room ${roomId}`, error);
@@ -154,7 +177,28 @@ class RoomManager {
             if (player) {
                 player.connected = false;
                 logger.info(`Player ${player.name} (${socketId}) disconnected from room ${roomId} (marked offline)`);
-                return { roomId, room };
+
+                const userId = player.userId;
+                if (userId) {
+                    // Start disconnection timer
+                    if (this.disconnectionTimers.has(userId)) {
+                        clearTimeout(this.disconnectionTimers.get(userId));
+                    }
+
+                    const timeoutId = setTimeout(() => {
+                        logger.info(`Player ${player.name} (${userId}) timed out after ${this.DISCONNECT_TIMEOUT}ms`);
+                        this.disconnectionTimers.delete(userId);
+                        const result = this.removePlayer(null, userId);
+                        if (result) {
+                            this.emit('room_updated', result.roomId, this.getSerializableRoom(result.room));
+                        }
+                    }, this.DISCONNECT_TIMEOUT);
+
+                    this.disconnectionTimers.set(userId, timeoutId);
+                    logger.info(`Disconnection timer started for ${player.name} (${userId}) - ${this.DISCONNECT_TIMEOUT}ms`);
+                }
+
+                return { roomId, room: this.getSerializableRoom(room) };
             }
         }
         return null;
@@ -186,7 +230,7 @@ class RoomManager {
                     room.players[0].isHost = true;
                     logger.info(`Host migrated to ${room.players[0].name} in room ${roomId}`);
                 }
-                return { roomId, room };
+                return { roomId, room: this.getSerializableRoom(room) };
             }
         }
         return null;
