@@ -12,7 +12,7 @@ export default function Table({
     onDraw,
     currentColor,
     turnStartTime,
-    turnDuration = 30000 // Default 30 seconds
+    turnDuration = 20000 // Default 30 seconds
 }) {
     // Filter out me from players to show opponents
     const opponents = players.filter(p => p.id !== me.id);
@@ -55,23 +55,23 @@ export default function Table({
                 {orderedOpponents.map((player, index) => {
                     const total = orderedOpponents.length;
 
-                    // Elliptical distribution
-                    // We want to distribute them from ~140deg to ~400deg (clockwise)
-                    // skipping the bottom center (90deg +/- 40)
+                    // Opponents start from the top (270deg) and spread outwards
+                    // We avoid the bottom area (near 90deg) where 'me' is located
+                    const centerAngle = 270;
 
-                    const startAngle = 140;
-                    const endAngle = 400;
-                    const angleRange = endAngle - startAngle;
+                    // Arc width increases with player count, but capped to leave space at the bottom
+                    const maxArc = 280;
+                    const arcWidth = Math.min(maxArc, (total - 1) * 45 + 60);
 
-                    const angleStep = angleRange / (total > 1 ? total - 1 : 1);
-                    const angle = total === 1 ? 270 : startAngle + index * angleStep;
+                    const startAngle = centerAngle - arcWidth / 2;
+                    const angleStep = total > 1 ? arcWidth / (total - 1) : 0;
+                    const angle = startAngle + index * angleStep;
 
                     // Radian conversion
                     const rad = (angle * Math.PI) / 180;
 
-                    // Dynamic radii based on common screen proportions
-                    const xRadius = Math.min(window.innerWidth * 0.42, 600);
-                    const yRadius = Math.min(window.innerHeight * 0.28, 240);
+                    const xRadius = Math.min(window.innerWidth * 0.38, 480);
+                    const yRadius = Math.min(window.innerHeight * 0.26, 220);
 
                     const x = Math.cos(rad) * xRadius;
                     const y = Math.sin(rad) * yRadius;
@@ -79,7 +79,7 @@ export default function Table({
                     const style = {
                         position: 'absolute',
                         left: '50%',
-                        top: '50%', // Center vertically within the play-screen slot
+                        top: '50%',
                         transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`,
                         transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
                         zIndex: 100
@@ -87,36 +87,53 @@ export default function Table({
 
                     const isTurn = players[turnIndex]?.id === player.id;
 
-                    // Calculate initial time remaining based on server's turn start time
-                    let initialTimeRemaining = turnDuration;
-                    if (isTurn && turnStartTime) {
-                        const elapsed = Date.now() - turnStartTime;
-                        initialTimeRemaining = Math.max(0, turnDuration - elapsed);
-                    }
-
                     return (
                         <TurnTimer
                             key={player.id}
                             isActive={isTurn}
-                            turnDuration={initialTimeRemaining} // Use calculated remaining time
-                            warningThreshold={10000} // 10 seconds
-                            criticalThreshold={5000} // 5 seconds
-                            onTimeout={() => {
-                                // Timer expired - server will handle auto-pass
-                                console.log(`Turn timeout for player ${player.name}`);
-                            }}
+                            turnStartTime={turnStartTime}
+                            style={style}
                         >
                             <PlayerBubble
-                                key={player.id}
                                 player={player}
                                 isTurn={isTurn}
-                                style={style}
                                 stats={[{ icon: '🎴', value: player.cardCount }]}
                                 tags={player.isUno ? ['UNO!'] : []}
                             />
                         </TurnTimer>
                     );
                 })}
+
+                {/* Always show "me" at the bottom center */}
+                {me && (
+                    <div className="me-bubble-container" style={{
+                        position: 'absolute',
+                        bottom: '20px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 150
+                    }}>
+                        {(() => {
+                            const myPlayer = players.find(p => p.id === me.id);
+                            if (!myPlayer) return null;
+                            const isMyTurn = players[turnIndex]?.id === me.id;
+
+                            return (
+                                <TurnTimer
+                                    isActive={isMyTurn}
+                                    turnStartTime={turnStartTime}
+                                >
+                                    <PlayerBubble
+                                        player={myPlayer}
+                                        isTurn={isMyTurn}
+                                        stats={[{ icon: '🎴', value: myPlayer.cardCount }]}
+                                        tags={myPlayer.isUno ? ['UNO!'] : []}
+                                    />
+                                </TurnTimer>
+                            );
+                        })()}
+                    </div>
+                )}
             </div>
 
             <div className="center-area" style={{

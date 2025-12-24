@@ -20,12 +20,12 @@ export default function PlayerBubble({
                 textAlign: 'center',
                 position: 'relative',
                 background: isTurn ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.4)',
-                padding: '6px',
-                borderRadius: '8px',
-                minWidth: '60px',
-                backdropFilter: 'blur(4px)',
-                border: isTurn ? '1.5px solid var(--primary-color, #6366f1)' : '1px solid rgba(255,255,255,0.1)',
-                boxShadow: isTurn ? '0 0 10px rgba(99, 102, 241, 0.3)' : '0 2px 4px rgba(0,0,0,0.3)',
+                padding: '8px 12px',
+                borderRadius: '12px',
+                minWidth: '80px',
+                backdropFilter: 'blur(8px)',
+                border: isTurn ? '2px solid var(--primary-color, #6366f1)' : '1px solid rgba(255,255,255,0.1)',
+                boxShadow: isTurn ? '0 0 15px rgba(99, 102, 241, 0.4)' : '0 4px 6px rgba(0,0,0,0.3)',
                 transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                 ...style
             }}
@@ -36,16 +36,16 @@ export default function PlayerBubble({
                 isEliminated={player.isEliminated || player.status === 'ELIMINATED'}
             />
 
-            <div className="player-info" style={{ pointerEvents: 'none', marginTop: '2px' }}>
+            <div className="player-info" style={{ pointerEvents: 'none', marginTop: '4px' }}>
                 <div className="player-name" style={{
-                    fontWeight: 'bold',
-                    fontSize: '0.7rem',
+                    fontWeight: '800',
+                    fontSize: '0.8rem',
                     color: '#fff',
                     textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '80px'
+                    maxWidth: '100px'
                 }}>
                     {player.name}
                 </div>
@@ -53,14 +53,14 @@ export default function PlayerBubble({
                 <div className="player-stats" style={{
                     display: 'flex',
                     justifyContent: 'center',
-                    gap: '6px',
-                    fontSize: '0.6rem',
+                    gap: '8px',
+                    fontSize: '0.75rem',
                     opacity: 0.9,
-                    marginTop: '1px'
+                    marginTop: '2px'
                 }}>
                     {stats.map((stat, i) => (
-                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <span style={{ fontSize: '0.7rem' }}>{stat.icon}</span>
+                        <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <span style={{ fontSize: '0.85rem' }}>{stat.icon}</span>
                             <span style={{ fontWeight: 'bold' }}>{stat.value}</span>
                         </span>
                     ))}

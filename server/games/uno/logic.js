@@ -17,10 +17,11 @@ class UnoGame {
         this.lastUnoShout = null; // { playerId, name, time }
 
         // Turn timer configuration
-        this.turnDuration = 30000; // 30 seconds per turn
+        this.turnDuration = 22000; // 30 seconds per turn
         this.turnStartTime = null;
         this.turnTimer = null;
         this.onTurnTimeout = null; // Callback for when turn times out
+        this.onStateChange = null; // Callback for when game state changes internally
     }
 
     // Initialize game with players
@@ -176,6 +177,9 @@ class UnoGame {
             // Notify via callback if set
             if (this.onTurnTimeout) {
                 this.onTurnTimeout();
+            }
+            if (this.onStateChange) {
+                this.onStateChange();
             }
         }, this.turnDuration);
     }
@@ -385,6 +389,10 @@ class UnoGame {
         this.turnIndex = this.getNextPlayerIndex();
         if (skip) {
             this.turnIndex = this.getNextPlayerIndex();
+        }
+
+        if (this.onStateChange) {
+            this.onStateChange();
         }
     }
 

@@ -13,6 +13,7 @@ class RoomManager extends EventEmitter {
         this.rooms = new Map(); // roomId -> { players: [], gameState: {}, ... }
         this.disconnectionTimers = new Map(); // userId -> timeoutId
         this.DISCONNECT_TIMEOUT = 30000; // 30 seconds
+        this.MAX_PLAYERS = 12;
     }
 
     createRoom(hostId, hostName, userId) {
@@ -56,10 +57,19 @@ class RoomManager extends EventEmitter {
                     gamePlayer.id = playerId;
                     // CRITICAL: Update gameState so the client gets the new ID in 'hands' map
                     room.gameState = room.game.getState();
+
+                    // Restore callback
+                    room.game.onStateChange = () => {
+                        room.gameState = room.game.getState();
+                        this.emit('room_updated', roomId, this.getSerializableRoom(room));
+                    };
                 }
             }
         } else {
             // New Join
+            if (room.players.length >= this.MAX_PLAYERS) {
+                return { error: `Room is full (max ${this.MAX_PLAYERS} players)` };
+            }
             // Check if name is taken? (Optional, but good practice)
             room.players.push({ id: playerId, name: playerName, isHost: false, userId, connected: true, status: 'WAITING' });
             logger.info(`Player ${playerName} (${playerId}) joined room ${roomId}`);
@@ -80,7 +90,7 @@ class RoomManager extends EventEmitter {
             players: room.players,
             gameState: room.gameState,
             status: room.status,
-
+            game: room.game ? { id: room.game.id } : null
         };
     }
 
@@ -99,6 +109,13 @@ class RoomManager extends EventEmitter {
             room.players.forEach(p => p.status = 'PLAYING');
             room.gameState = room.game.getState();
             room.status = 'PLAYING';
+
+            // Set state change callback
+            room.game.onStateChange = () => {
+                room.gameState = room.game.getState();
+                this.emit('room_updated', roomId, this.getSerializableRoom(room));
+            };
+
             logger.info(`Game ${gameId} started in room ${roomId}`);
         } catch (error) {
             logger.error(`Error initializing game ${gameId} in room ${roomId}`, error);

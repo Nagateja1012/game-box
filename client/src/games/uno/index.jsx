@@ -213,7 +213,12 @@ export default function Uno({ room, me }) {
                     )}
 
                     {gameState.drawStack > 0 && (
-                        <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', color: 'red', fontSize: '2em', fontWeight: 'bold', textShadow: '0 0 10px black', pointerEvents: 'none', zIndex: 20 }}>
+                        <div style={{
+                            position: 'absolute', top: '70%', left: '50%',
+                            transform: 'translate(-50%, -50%)', color: '#ff4444',
+                            fontSize: '1.8em', fontWeight: 'bold',
+                            pointerEvents: 'none', zIndex: 20, letterSpacing: '2px'
+                        }}>
                             STACK: +{gameState.drawStack}
                         </div>
                     )}

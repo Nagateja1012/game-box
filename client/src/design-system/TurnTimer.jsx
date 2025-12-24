@@ -12,56 +12,40 @@ import React, { useState, useEffect, useRef } from 'react';
  */
 export default function TurnTimer({
     isActive = false,
-    turnDuration = 30000, // 30 seconds default
-    warningThreshold = 10000, // 10 seconds
-    criticalThreshold = 5000, // 5 seconds
+    turnStartTime = null, // From server
+    totalDuration = 20000, // From server
+    warningThreshold = 12000,
+    criticalThreshold = 5000,
     onTimeout = () => { },
+    style = {},
     children
 }) {
-    const [timeRemaining, setTimeRemaining] = useState(turnDuration);
-    const [isRunning, setIsRunning] = useState(false);
-    const startTimeRef = useRef(null);
+    const [timeRemaining, setTimeRemaining] = useState(totalDuration);
     const animationFrameRef = useRef(null);
-    const timeoutRef = useRef(null);
+    const endTimeRef = useRef(null);
 
-    // Start/stop timer based on isActive
     useEffect(() => {
-        if (isActive) {
-            // Start timer
-            startTimeRef.current = Date.now();
-            setTimeRemaining(turnDuration);
-            setIsRunning(true);
+        if (isActive && turnStartTime) {
+            endTimeRef.current = turnStartTime + totalDuration;
 
-            // Set timeout for when time runs out
-            timeoutRef.current = setTimeout(() => {
-                setIsRunning(false);
-                setTimeRemaining(0);
-                onTimeout();
-            }, turnDuration);
-
-            // Start animation loop for smooth updates
             const updateTimer = () => {
-                if (startTimeRef.current) {
-                    const elapsed = Date.now() - startTimeRef.current;
-                    const remaining = Math.max(0, turnDuration - elapsed);
-                    setTimeRemaining(remaining);
+                const now = Date.now();
+                const remaining = Math.max(0, endTimeRef.current - now);
+                setTimeRemaining(remaining);
 
-                    if (remaining > 0) {
-                        animationFrameRef.current = requestAnimationFrame(updateTimer);
-                    }
+                if (remaining > 0) {
+                    animationFrameRef.current = requestAnimationFrame(updateTimer);
+                } else {
+                    onTimeout();
                 }
             };
+
+            // Start the animation frame loop
             animationFrameRef.current = requestAnimationFrame(updateTimer);
         } else {
-            // Stop timer
-            setIsRunning(false);
-            setTimeRemaining(turnDuration);
-            startTimeRef.current = null;
-
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-                timeoutRef.current = null;
-            }
+            // Turn ended or not active
+            setTimeRemaining(totalDuration);
+            endTimeRef.current = null;
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
                 animationFrameRef.current = null;
@@ -69,76 +53,58 @@ export default function TurnTimer({
         }
 
         return () => {
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-            if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+                animationFrameRef.current = null;
+            }
         };
-    }, [isActive, turnDuration, onTimeout]);
-
-    // Calculate progress (0 to 1)
-    const progress = timeRemaining / turnDuration;
+    }, [isActive, turnStartTime, totalDuration, onTimeout]);
 
     // Determine color based on thresholds
-    let ringColor = '#4ade80'; // green (default)
+    let ringColor = '#4ade80'; // green
     if (timeRemaining <= criticalThreshold) {
-        ringColor = '#ef4444'; // red (critical)
+        ringColor = '#ef4444'; // red
     } else if (timeRemaining <= warningThreshold) {
-        ringColor = '#fbbf24'; // yellow/orange (warning)
+        ringColor = '#fbbf24'; // yellow/orange
     }
 
-    // SVG circle parameters
-    const size = 100; // Size of the SVG viewBox
-    const strokeWidth = 4;
-    const radius = (size - strokeWidth) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference * (1 - progress);
-
     return (
-        <div style={{ position: 'relative', display: 'inline-block' }}>
-            {children}
-
-            {isActive && isRunning && (
-                <svg
-                    style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        width: 'calc(100% + 16px)',
-                        height: 'calc(100% + 16px)',
-                        pointerEvents: 'none',
-                        zIndex: 1000
-                    }}
-                    viewBox={`0 0 ${size} ${size}`}
-                >
-                    {/* Background circle */}
-                    <circle
-                        cx={size / 2}
-                        cy={size / 2}
-                        r={radius}
-                        fill="none"
-                        stroke="rgba(255, 255, 255, 0.2)"
-                        strokeWidth={strokeWidth}
-                    />
-
-                    {/* Progress circle */}
-                    <circle
-                        cx={size / 2}
-                        cy={size / 2}
-                        r={radius}
-                        fill="none"
-                        stroke={ringColor}
-                        strokeWidth={strokeWidth}
-                        strokeLinecap="round"
-                        strokeDasharray={circumference}
-                        strokeDashoffset={strokeDashoffset}
-                        transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                        style={{
-                            transition: 'stroke 0.3s ease, stroke-dashoffset 0.1s linear',
-                            filter: 'drop-shadow(0 0 4px rgba(0, 0, 0, 0.5))'
-                        }}
-                    />
-                </svg>
+        <div style={{
+            position: 'relative',
+            display: 'inline-block',
+            borderRadius: '12px',
+            transition: 'all 0.3s ease',
+            ...style
+        }}>
+            {/* Background highlight/glow */}
+            {isActive && (
+                <div style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    left: '-6px',
+                    right: '-6px',
+                    bottom: '-6px',
+                    borderRadius: '16px',
+                    border: `3px solid ${ringColor}`,
+                    boxShadow: `0 0 15px ${ringColor}, inset 0 0 10px ${ringColor}`,
+                    zIndex: 0,
+                    animation: 'pulse-glow 1.5s infinite alternate',
+                    pointerEvents: 'none'
+                }} />
             )}
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+                {children}
+            </div>
+
+            <style>
+                {`
+                @keyframes pulse-glow {
+                    from { opacity: 0.6; transform: scale(0.98); }
+                    to { opacity: 1; transform: scale(1.02); }
+                }
+                `}
+            </style>
         </div>
     );
 }
