@@ -165,11 +165,24 @@ class UnoGame {
             logger.info(`Turn timeout for player ${currentPlayer.name}`);
 
             // Auto-pass or auto-draw then pass
-            if (currentPlayer.hasDrawn || this.drawStack > 0) {
-                // If already drawn or facing a stack, just pass
+            if (this.drawStack > 0) {
+                // If facing a stack, draw the whole stack plus one penalty card, then advance turn
+                const totalToDraw = this.drawStack + 1;
+                for (let i = 0; i < totalToDraw; i++) {
+                    const card = this.drawCard();
+                    if (card) currentPlayer.hand.push(card);
+                }
+                logger.info(`Turn timeout for ${currentPlayer.name}: drew ${totalToDraw} cards (${this.drawStack} from stack + 1 penalty)`);
+                this.drawStack = 0;
+                this.stackType = null;
+                currentPlayer.hasDrawn = false;
+                this.advanceTurn();
+                this.startTurnTimer();
+            } else if (currentPlayer.hasDrawn) {
+                // If already drawn, just pass
                 this.passTurn(this.turnIndex);
             } else {
-                // Draw a card first, then pass
+                // Normal timeout: Draw a card first, then pass
                 this.playerDrawCard(this.turnIndex);
                 this.passTurn(this.turnIndex);
             }
