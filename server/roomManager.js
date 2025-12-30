@@ -14,6 +14,18 @@ class RoomManager extends EventEmitter {
         this.disconnectionTimers = new Map(); // userId -> timeoutId
         this.DISCONNECT_TIMEOUT = 30000; // 30 seconds
         this.MAX_PLAYERS = 12;
+        this.IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+        this.MAX_ROOM_DURATION = 120 * 60 * 1000; // 120 minutes
+
+        // Start background cleanup
+        this.cleanupInterval = setInterval(() => this.checkRoomTimeouts(), 60000); // Every minute
+    }
+
+    updateActivity(roomId) {
+        const room = this.rooms.get(roomId);
+        if (room) {
+            room.lastActivity = Date.now();
+        }
     }
 
     createRoom(hostId, hostName, userId) {
@@ -23,7 +35,9 @@ class RoomManager extends EventEmitter {
             players: [{ id: hostId, name: hostName, isHost: true, userId, connected: true, status: 'WAITING' }],
             gameState: null,
             game: null, // The active game instance
-            status: 'LOBBY' // LOBBY, PLAYING
+            status: 'LOBBY', // LOBBY, PLAYING
+            createdAt: Date.now(),
+            lastActivity: Date.now()
         });
         logger.info(`Room created: ${roomId} by ${hostName} (${hostId})`);
         return roomId;
@@ -75,6 +89,7 @@ class RoomManager extends EventEmitter {
             logger.info(`Player ${playerName} (${playerId}) joined room ${roomId}`);
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -122,6 +137,7 @@ class RoomManager extends EventEmitter {
             return { error: 'Failed to start game' };
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -138,6 +154,7 @@ class RoomManager extends EventEmitter {
         room.players.forEach(p => p.status = 'WAITING');
         logger.info(`Game stopped in room ${roomId} by host`);
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -179,6 +196,7 @@ class RoomManager extends EventEmitter {
             const changed = room.game.handleAction(action, player);
             if (changed) {
                 room.gameState = room.game.getState();
+                this.updateActivity(roomId);
                 return { room: this.getSerializableRoom(room) };
             }
         } catch (error) {
@@ -251,6 +269,38 @@ class RoomManager extends EventEmitter {
             }
         }
         return null;
+    }
+
+    checkRoomTimeouts() {
+        const now = Date.now();
+        for (const [roomId, room] of this.rooms.entries()) {
+            const isIdle = now - room.lastActivity > this.IDLE_TIMEOUT;
+            const isExpired = now - room.createdAt > this.MAX_ROOM_DURATION;
+
+            if (isIdle || isExpired) {
+                const reason = isIdle ? 'IDLE' : 'EXPIRED';
+                logger.info(`Closing room ${roomId} due to ${reason}`);
+
+                // Emit event for socketHandlers to broadcast
+                this.emit('room_closed', roomId, { reason });
+
+                // Explicitly stop any active game (clears timers)
+                if (room.game && room.game.stop) {
+                    room.game.stop();
+                }
+
+                // Cleanup
+                this.rooms.delete(roomId);
+
+                // Clear any pending disconnect timers for players in this room
+                room.players.forEach(p => {
+                    if (p.userId && this.disconnectionTimers.has(p.userId)) {
+                        clearTimeout(this.disconnectionTimers.get(p.userId));
+                        this.disconnectionTimers.delete(p.userId);
+                    }
+                });
+            }
+        }
     }
 }
 

@@ -104,6 +104,18 @@ function App() {
       handleExitRoom();
     }
 
+    function onRoomClosed({ reason }) {
+      const messages = {
+        'IDLE': 'Room closed due to 30 minutes of inactivity.',
+        'EXPIRED': 'Room closed: Maximum duration (120 minutes) reached.'
+      };
+
+      const msg = messages[reason] || 'Room has been closed by the server.';
+      setError(msg);
+      handleExitRoom(true); // true to keep the error message visible
+      setTimeout(() => setError(''), 10000); // persistent for 10s
+    }
+
     function onError(msg) {
       if (fallbackTimer) {
         clearTimeout(fallbackTimer);
@@ -132,6 +144,7 @@ function App() {
     socket.on('room_created', onRoomCreated);
     socket.on('room_updated', onRoomUpdated);
     socket.on('left_room', onLeftRoom);
+    socket.on('room_closed', onRoomClosed);
     socket.on('error', onError);
     socket.on('connect_error', onConnectError);
 
@@ -159,6 +172,7 @@ function App() {
         socket.off('room_created', onRoomCreated);
         socket.off('room_updated', onRoomUpdated);
         socket.off('left_room', onLeftRoom);
+        socket.off('room_closed', onRoomClosed);
         socket.on('error', onError);
         socket.off('connect_error', onConnectError);
         socket.disconnect();
@@ -171,6 +185,7 @@ function App() {
       socket.off('room_created', onRoomCreated);
       socket.off('room_updated', onRoomUpdated);
       socket.off('left_room', onLeftRoom);
+      socket.off('room_closed', onRoomClosed);
       socket.off('error', onError);
       socket.off('connect_error', onConnectError);
       socket.disconnect();

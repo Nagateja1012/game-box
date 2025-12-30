@@ -7,6 +7,11 @@ function init(io) {
         logger.info(`Async room update for room ${roomId}`);
         io.to(roomId).emit('room_updated', room);
     });
+
+    roomManager.on('room_closed', (roomId, { reason }) => {
+        logger.info(`Room ${roomId} closed: ${reason}`);
+        io.to(roomId).emit('room_closed', { reason });
+    });
 }
 
 function setupSocketHandlers(io, socket) {

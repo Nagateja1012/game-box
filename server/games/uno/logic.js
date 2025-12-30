@@ -499,6 +499,11 @@ class UnoGame {
 
         return false; // Game continues
     }
+
+    stop() {
+        this.clearTurnTimer();
+        this.gameStatus = 'ENDED';
+    }
 }
 
 module.exports = UnoGame;

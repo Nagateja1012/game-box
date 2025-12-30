@@ -233,6 +233,7 @@ export default function Uno({ room, me }) {
                         turnStartTime={gameState.turnStartTime}
                         roomId={room.id}
                         turnDuration={gameState.turnDuration}
+                        drawStack={gameState.drawStack}
                     />
 
                     <PopNotification
@@ -276,16 +277,6 @@ export default function Uno({ room, me }) {
                         </Button>
                     )}
 
-                    {gameState.drawStack > 0 && (
-                        <div style={{
-                            position: 'absolute', top: '70%', left: '50%',
-                            transform: 'translate(-50%, -50%)', color: '#ff4444',
-                            fontSize: '1.8em', fontWeight: 'bold',
-                            pointerEvents: 'none', zIndex: 20, letterSpacing: '2px'
-                        }}>
-                            STACK: +{gameState.drawStack}
-                        </div>
-                    )}
 
                     {showUnoButton && (
                         <button className="uno-button" onClick={handleUnoShout} style={{ bottom: '20px' }}>

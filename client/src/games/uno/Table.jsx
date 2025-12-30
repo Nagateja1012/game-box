@@ -13,7 +13,8 @@ export default function Table({
     currentColor,
     turnStartTime,
     roomId,
-    turnDuration = 20000 // Default 30 seconds
+    turnDuration = 20000, // Default 30 seconds
+    drawStack = 0
 }) {
     // Filter out me from players to show opponents
     const opponents = players.filter(p => p.id !== me.id);
@@ -171,10 +172,31 @@ export default function Table({
                     </div>
                 )}
 
-                <div className="piles-container" style={{ display: 'flex', gap: '50px', alignItems: 'center' }}>
+                <div className="piles-container" style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
                     <div className="deck-pile" onClick={onDraw} style={{ cursor: 'pointer' }}>
                         <Card size="normal" />
                     </div>
+
+                    {drawStack > 0 && (
+                        <div style={{
+                            writingMode: 'vertical-rl',
+                            textOrientation: 'upright',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#ff4d4d',
+                            fontSize: '1.5rem',
+                            fontWeight: '900',
+                            letterSpacing: '1px',
+                            textShadow: '0 0 10px rgba(255, 77, 77, 0.4)',
+                            animation: 'pulse 1.5s infinite ease-in-out',
+                            whiteSpace: 'nowrap',
+                            userSelect: 'none'
+                        }}>
+                            +{drawStack}
+                        </div>
+                    )}
+
                     <div className="discard-pile" style={{ position: 'relative' }}>
                         {topCard && <Card key={topCard.id} card={topCard} size="normal" />}
                         {topCard?.color === 'BLACK' && currentColor && (
