@@ -209,6 +209,7 @@ class RoomManager extends EventEmitter {
             }
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -293,6 +294,7 @@ class RoomManager extends EventEmitter {
                     room.players[0].isHost = true;
                     logger.info(`Host migrated to ${room.players[0].name} in room ${roomId}`);
                 }
+                this.updateActivity(roomId);
                 return { roomId, room: this.getSerializableRoom(room) };
             }
         }

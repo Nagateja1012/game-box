@@ -32,7 +32,11 @@ export default function Uno({ room, me }) {
         }
         // Game End
         if (prevGameStatus.current !== 'ENDED' && gameState.gameStatus === 'ENDED') {
-            soundManager.playGameEnd();
+            if (gameState.winner?.id === me.id) {
+                soundManager.playWin();
+            } else {
+                soundManager.playLose();
+            }
         }
         prevGameStatus.current = gameState.gameStatus;
 
@@ -75,6 +79,7 @@ export default function Uno({ room, me }) {
 
             if (isRecent && skip.playerId === me.id) {
                 setSkipPopUp(skip);
+                soundManager.playSkipped();
                 const timer = setTimeout(() => setSkipPopUp(null), 1500);
                 lastProcessedSkipTime.current = skip.timestamp;
                 return () => clearTimeout(timer);
@@ -112,6 +117,7 @@ export default function Uno({ room, me }) {
         // Client-side validation
         if (!isValidMove(card, gameState.topCard, gameState.drawStack, gameState.stackType, gameState.currentColor)) {
             setShowInvalidMove(true);
+            soundManager.playInvalid();
             return;
         }
 
@@ -154,6 +160,7 @@ export default function Uno({ room, me }) {
             roomId: room.id,
             action: { type: 'PASS_TURN' }
         });
+        soundManager.playClick();
     };
 
     const handleUnoShout = () => {
@@ -168,48 +175,18 @@ export default function Uno({ room, me }) {
     // Game Over Overlay
     let gameOverNode = null;
     if (gameState.gameStatus === 'ENDED') {
-        const actions = (
-            <>
-                {isHost && (
-                    <Button
-                        variant="primary"
-                        style={{ width: '200px' }}
-                        onClick={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
-                    >
-                        PLAY AGAIN
-                    </Button>
-                )}
-
-                {isHost && (
-                    <Button
-                        variant="primary"
-                        style={{
-                            width: '200px',
-                            border: '2px solid #ff5555',
-                            background: 'rgba(255, 85, 85, 0.95)'
-                        }}
-                        onClick={() => socket.emit('stop_game', { roomId: room.id })}
-                    >
-                        CLOSE GAME
-                    </Button>
-                )}
-
-                <Button
-                    variant="secondary"
-                    style={{ width: '200px' }}
-                    onClick={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
-                >
-                    BACK TO LOBBY
-                </Button>
-            </>
-        );
-
         gameOverNode = (
             <GameOverOverlay
                 winner={gameState.winner}
                 players={gameState.players}
                 scores={gameState.scores || {}}
-                actions={actions}
+                isHost={isHost}
+                onRestart={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
+                onClose={() => socket.emit('stop_game', { roomId: room.id })}
+                onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+                title="UNO WINNER!"
+                scoreLabel="POINTS"
+                sortOrder="asc"
             />
         );
     }

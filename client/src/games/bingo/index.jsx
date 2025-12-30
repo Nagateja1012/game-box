@@ -144,7 +144,11 @@ export default function Bingo({ room, me }) {
             // Server notifications usually stick for a bit, using same helper
             showNotification(data.message || data.type);
             if (['TURN_SKIPPED', 'INVALID'].some(k => (data.message || '').toUpperCase().includes(k))) {
-                soundManager.playError();
+                if ((data.message || '').includes('Skipped') && data.playerId === me.id) {
+                    soundManager.playSkipped();
+                } else {
+                    soundManager.playInvalid();
+                }
             }
         };
         socket.on('game_notification', handleNotification);
@@ -154,13 +158,22 @@ export default function Bingo({ room, me }) {
     // Voice Announcement Logic
     useEffect(() => {
         if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !soundManager.muted) {
-            const utterance = new SpeechSynthesisUtterance(gameState.lastCalledNumber.toString());
-            utterance.rate = 1;
-            utterance.pitch = 1;
-            window.speechSynthesis.cancel(); // Cancel any ongoing speech
-            window.speechSynthesis.speak(utterance);
+            soundManager.playSpeech(gameState.lastCalledNumber.toString(), 0.85);
         }
     }, [gameState.lastCalledNumber, gameState.status]);
+
+    // Game End Sound
+    const prevStatus = React.useRef(gameState.status);
+    useEffect(() => {
+        if (prevStatus.current !== 'ENDED' && gameState.status === 'ENDED') {
+            if (gameState.winner?.id === me.id) {
+                soundManager.playWin();
+            } else {
+                soundManager.playLose();
+            }
+        }
+        prevStatus.current = gameState.status;
+    }, [gameState.status, me.id, gameState.winner]);
 
 
 
@@ -182,6 +195,7 @@ export default function Bingo({ room, me }) {
         updateDraft(numbers);
         setSetupMode('CUSTOM');
         setIsRandomMode(true);
+        soundManager.playPop();
     };
 
     const updateDraft = (grid) => {
@@ -345,15 +359,15 @@ export default function Bingo({ room, me }) {
                             roomId: room.id,
                             action: { type: 'CLAIM_LETTER', letter: nextLetter }
                         });
-                        soundManager.playSuccess();
+                        soundManager.playSmallWin();
                     }
                 } else {
                     showNotification("Complete the line first!");
-                    soundManager.playError();
+                    soundManager.playInvalid();
                 }
             } else {
                 showNotification("Invalid Line!");
-                soundManager.playError();
+                soundManager.playInvalid();
             }
         };
 
@@ -387,7 +401,7 @@ export default function Bingo({ room, me }) {
                 soundManager.playClick();
             } else {
                 showNotification("Invalid Selection!");
-                soundManager.playError();
+                soundManager.playInvalid();
             }
         }
     };
@@ -462,14 +476,16 @@ export default function Bingo({ room, me }) {
             return acc;
         }, {});
 
-        const actions = (
-            <Button variant="secondary" onClick={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}>BACK TO LOBBY</Button>
-        );
+        const isHost = mePlayer?.isHost;
         gameOverNode = <GameOverOverlay
             winner={gameState.winner}
             players={gameState.players}
             scores={bingoScores}
-            actions={actions}
+            isHost={isHost}
+            onRestart={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
+            onClose={() => socket.emit('stop_game', { roomId: room.id })}
+            onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+            title="BINGO WINNER!"
             scoreLabel="LETTERS CLAIMED"
             sortOrder="desc"
         />;

@@ -1,32 +1,41 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import PlayerAvatar from './PlayerAvatar';
+import Button from './Button';
+import { soundManager } from '../utils/soundManager';
 
 export default function GameOverOverlay({
     winner,
     players = [],
     scores = {}, // { playerId: value }
-    actions,
+    onRestart,
+    onClose,
+    onLeave,
+    isHost = false,
     title = "WINNER!",
     scoreLabel = "SCORE",
-    sortOrder = 'asc' // 'asc' for small is better (Uno), 'desc' for big is better (Bingo)
+    sortOrder = 'asc' // 'asc' for Uno, 'desc' for Bingo
 }) {
+    // Sort players by score
     const sortedPlayers = [...players]
         .map(p => {
             const score = scores[p.id];
-            // If score is an object (for complex sorting), we'll handle it
+            // Handle complex score objects (e.g. Bingo) or simple numbers
+            const rawScore = (score && typeof score === 'object') ? score.primary : (score || 0);
             const displayScore = (score && typeof score === 'object') ? score.display : (score || 0);
-            return { ...p, score: score || 0, displayScore };
+            return { ...p, rawScore, displayScore };
         })
         .sort((a, b) => {
-            if (typeof a.score === 'object' && typeof b.score === 'object') {
-                // Complex sort (e.g. Bingo letters + timestamp)
-                if (a.score.primary !== b.score.primary) {
-                    return sortOrder === 'asc' ? a.score.primary - b.score.primary : b.score.primary - a.score.primary;
-                }
-                return a.score.secondary - b.score.secondary; // Earlier time is always better
+            if (sortOrder === 'asc') {
+                return a.rawScore - b.rawScore;
+            } else {
+                return b.rawScore - a.rawScore;
             }
-            return sortOrder === 'asc' ? a.score - b.score : b.score - a.score;
         });
+
+    // Play hover sound helper
+    const handleHover = () => {
+        soundManager.playHover();
+    };
 
     return (
         <div className="modal-overlay game-over-overlay" style={{
@@ -77,7 +86,9 @@ export default function GameOverOverlay({
                         background: 'rgba(255,255,255,0.05)',
                         padding: '20px',
                         borderRadius: '20px',
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        maxHeight: '30vh',
+                        overflowY: 'auto'
                     }}>
                         <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>{scoreLabel}</h3>
                         {sortedPlayers.map((p, i) => (
@@ -103,11 +114,56 @@ export default function GameOverOverlay({
                 <div className="actions" style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px',
+                    gap: '12px',
                     marginTop: '30px',
                     alignItems: 'center'
                 }}>
-                    {actions}
+                    {isHost && onRestart && (
+                        <Button
+                            variant="primary"
+                            style={{ width: '240px', padding: '12px', fontSize: '1.1rem' }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onRestart();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            PLAY AGAIN
+                        </Button>
+                    )}
+
+                    {isHost && onClose && (
+                        <Button
+                            variant="primary"
+                            style={{
+                                width: '240px',
+                                border: '2px solid #ff5555',
+                                background: 'rgba(255, 85, 85, 0.15)',
+                                color: '#ff5555'
+                            }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onClose();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            CLOSE GAME
+                        </Button>
+                    )}
+
+                    {onLeave && (
+                        <Button
+                            variant="secondary"
+                            style={{ width: '240px' }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onLeave();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            BACK TO LOBBY
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>
