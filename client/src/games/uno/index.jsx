@@ -18,8 +18,8 @@ export default function Uno({ room, me }) {
     const [showInvalidMove, setShowInvalidMove] = useState(false);
     const [skipPopUp, setSkipPopUp] = useState(null);
 
-    const lastProcessedShoutTime = React.useRef(0);
-    const lastProcessedSkipTime = React.useRef(0);
+    const lastProcessedShoutTime = React.useRef(gameState.lastUnoShout?.time || 0);
+    const lastProcessedSkipTime = React.useRef(gameState.lastSkip?.timestamp || 0);
     const prevTurnIndex = React.useRef(gameState.turnIndex);
     const prevGameStatus = React.useRef(gameState.gameStatus);
 
@@ -46,12 +46,21 @@ export default function Uno({ room, me }) {
     }, [gameState.gameStatus, gameState.turnIndex]);
 
     useEffect(() => {
-        if (gameState.lastUnoShout && gameState.lastUnoShout.time > lastProcessedShoutTime.current) {
-            setUnoPopUp(gameState.lastUnoShout);
-            lastProcessedShoutTime.current = gameState.lastUnoShout.time;
-            soundManager.playUnoShout();
-            const timer = setTimeout(() => setUnoPopUp(null), 2000);
-            return () => clearTimeout(timer);
+        const shout = gameState.lastUnoShout;
+        if (shout && shout.time > lastProcessedShoutTime.current) {
+            // Only show if the shout is very recent (within 5 seconds) to avoid historical popups on join
+            const isRecent = Date.now() - shout.time < 5000;
+
+            if (isRecent) {
+                setUnoPopUp(shout);
+                soundManager.playUnoShout();
+                const timer = setTimeout(() => setUnoPopUp(null), 2000);
+                lastProcessedShoutTime.current = shout.time;
+                return () => clearTimeout(timer);
+            } else {
+                // If not recent, just update the ref to keep it quiet
+                lastProcessedShoutTime.current = shout.time;
+            }
         }
     }, [gameState.lastUnoShout?.time]);
 
@@ -63,14 +72,17 @@ export default function Uno({ room, me }) {
     }, [showInvalidMove]);
 
     useEffect(() => {
-        if (gameState.lastSkip && gameState.lastSkip.timestamp > lastProcessedSkipTime.current) {
-            if (gameState.lastSkip.playerId === me.id) {
-                setSkipPopUp(gameState.lastSkip);
+        const skip = gameState.lastSkip;
+        if (skip && skip.timestamp > lastProcessedSkipTime.current) {
+            const isRecent = Date.now() - skip.timestamp < 5000;
+
+            if (isRecent && skip.playerId === me.id) {
+                setSkipPopUp(skip);
                 const timer = setTimeout(() => setSkipPopUp(null), 1500);
-                lastProcessedSkipTime.current = gameState.lastSkip.timestamp;
+                lastProcessedSkipTime.current = skip.timestamp;
                 return () => clearTimeout(timer);
             }
-            lastProcessedSkipTime.current = gameState.lastSkip.timestamp;
+            lastProcessedSkipTime.current = skip.timestamp;
         }
     }, [gameState.lastSkip?.timestamp, me.id]);
 
