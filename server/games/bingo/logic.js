@@ -31,11 +31,13 @@ class BingoGame {
             draftGrid: [],
             markedCells: [],
             claimedLetters: [],
+            lastClaimTime: 0,
             isReady: false,
             score: 0
         }));
 
         this.gameState.gridSize = this.calculateGridSize(this.players.length);
+        this.gameState.turnIndex = Math.floor(Math.random() * this.players.length);
 
         // Start Setup Timer
         this.gameState.setupEndTime = Date.now() + this.SETUP_DURATION;
@@ -209,6 +211,7 @@ class BingoGame {
         const completedLines = this.calculateCompletedLines(player);
         if (completedLines > player.claimedLetters.length) {
             player.claimedLetters.push(letter);
+            player.lastClaimTime = Date.now();
 
             if (player.claimedLetters.length === 5) {
                 this.gameState.winner = player;
@@ -315,6 +318,49 @@ class BingoGame {
         return false;
     }
 
+    removePlayer(playerId) {
+        const playerIndex = this.players.findIndex(p => p.id === playerId);
+        if (playerIndex === -1) return false;
+
+        const isLeavingPlayerTurn = (this.gameState.turnIndex === playerIndex);
+
+        this.players.splice(playerIndex, 1);
+        console.log(`BINGO: Removing player ${playerId}. ${this.players.length} left.`);
+
+        // Adjust turn index
+        if (this.gameState.turnIndex > playerIndex) {
+            this.gameState.turnIndex--;
+        } else if (this.gameState.turnIndex === playerIndex) {
+            // It was their turn (to call, or they were the current caller during marking)
+            this.gameState.turnPhase = 'CALLING';
+            if (this.gameState.turnIndex >= this.players.length) {
+                this.gameState.turnIndex = 0;
+            }
+
+            // Start next person's calling turn immediately
+            if (this.players.length >= 2 && this.gameState.status === 'PLAYING') {
+                this.startTurn();
+            }
+        }
+
+        // Final bounds check
+        if (this.gameState.turnIndex >= this.players.length && this.players.length > 0) {
+            this.gameState.turnIndex = 0;
+        }
+
+        // Win condition: 1 player remains
+        if (this.players.length < 2 && this.gameState.status === 'PLAYING') {
+            this.gameState.winner = this.players[0]; // Could be undefined if 0 players
+            this.gameState.status = 'ENDED';
+            this.stop();
+            this.emitStateChange();
+            return true;
+        }
+
+        this.emitStateChange();
+        return false;
+    }
+
     getState() {
         return {
             ...this.gameState,
@@ -323,6 +369,7 @@ class BingoGame {
                 name: p.name,
                 isHost: p.isHost,
                 claimedLetters: p.claimedLetters,
+                lastClaimTime: p.lastClaimTime,
                 isReady: p.isReady,
                 grid: p.grid,
                 markedCells: p.markedCells

@@ -12,7 +12,8 @@ export default function PlayerBubble({
     stats = [], // Array of objects { icon, value }
     tags = [], // Array of strings (e.g. "UNO!", "CHICKEN")
     className = '',
-    style = {}
+    style = {},
+    variant = 'cards' // 'cards' (Uno), 'bingo' (Bingo badge)
 }) {
     const [isHovered, setIsHovered] = useState(false);
     const [activeEmote, setActiveEmote] = useState(null);
@@ -41,21 +42,22 @@ export default function PlayerBubble({
 
     return (
         <div
-            className={`player-bubble ${isTurn ? 'active' : ''} ${className}`}
+            className={`player-bubble ${isTurn ? 'active' : ''} ${variant} ${className}`}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             style={{
                 display: 'flex',
-                flexDirection: 'column',
+                flexDirection: variant === 'bingo' ? 'row' : 'column',
                 alignItems: 'center',
-                gap: '2px',
-                textAlign: 'center',
+                gap: variant === 'bingo' ? '12px' : '2px',
+                textAlign: variant === 'bingo' ? 'left' : 'center',
                 position: 'relative',
                 background: isHovered && isMe ? 'rgba(255, 255, 255, 0.25)' :
                     (isTurn ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.4)'),
-                padding: '8px 12px',
-                borderRadius: '12px',
-                minWidth: '80px',
+                padding: variant === 'bingo' ? '4px 12px' : '8px 12px',
+                borderRadius: variant === 'bingo' ? '30px' : '12px',
+                minWidth: variant === 'bingo' ? '160px' : '80px',
+                height: variant === 'bingo' ? '42px' : 'auto',
                 backdropFilter: 'blur(8px)',
                 border: isTurn ? '2px solid var(--primary-color, #6366f1)' : '1px solid rgba(255,255,255,0.1)',
                 boxShadow: isTurn ? '0 0 15px rgba(99, 102, 241, 0.4)' : '0 4px 6px rgba(0,0,0,0.3)',
@@ -137,9 +139,17 @@ export default function PlayerBubble({
                 name={player.name}
                 isTurn={isTurn}
                 isEliminated={player.isEliminated || player.status === 'ELIMINATED'}
+                size={variant === 'bingo' ? 'sm' : 'md'}
             />
 
-            <div className="player-info" style={{ pointerEvents: 'none', marginTop: '4px' }}>
+            <div className="player-info" style={{
+                pointerEvents: 'none',
+                marginTop: variant === 'bingo' ? '0' : '4px',
+                display: variant === 'bingo' ? 'flex' : 'block',
+                alignItems: variant === 'bingo' ? 'center' : 'stretch',
+                gap: variant === 'bingo' ? '12px' : '0',
+                flex: variant === 'bingo' ? 1 : 'none'
+            }}>
                 <div className="player-name" style={{
                     fontWeight: '800',
                     fontSize: '0.8rem',
@@ -148,18 +158,19 @@ export default function PlayerBubble({
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
-                    maxWidth: '100px'
+                    maxWidth: variant === 'bingo' ? '80px' : '100px'
                 }}>
                     {player.name}
                 </div>
 
                 <div className="player-stats" style={{
                     display: 'flex',
-                    justifyContent: 'center',
+                    justifyContent: variant === 'bingo' ? 'flex-end' : 'center',
                     gap: '8px',
                     fontSize: '0.75rem',
                     opacity: 0.9,
-                    marginTop: '2px'
+                    marginTop: variant === 'bingo' ? '0' : '2px',
+                    marginLeft: variant === 'bingo' ? 'auto' : '0'
                 }}>
                     {stats.map((stat, i) => (
                         <span key={i} style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>

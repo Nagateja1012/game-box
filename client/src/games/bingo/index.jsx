@@ -7,6 +7,7 @@ import PopNotification from '../../design-system/PopNotification';
 import GameOverOverlay from '../../design-system/GameOverOverlay';
 import PlayerBubble from '../../design-system/PlayerBubble';
 import TurnTimer from '../../design-system/TurnTimer';
+import TurnIndicator from '../../design-system/TurnIndicator';
 import './bingo.css';
 
 // Helper to generate empty grid
@@ -20,6 +21,13 @@ export default function Bingo({ room, me }) {
     const [notification, setNotification] = useState(null);
     const [timer, setTimer] = useState(0);
     const [pathVersion, setPathVersion] = useState(0);
+    const [isMuted, setIsMuted] = useState(() => {
+        try {
+            return localStorage.getItem('bingo_voice_muted') === 'true';
+        } catch {
+            return false;
+        }
+    });
 
     // Custom Fill state
     const [availableNumbers, setAvailableNumbers] = useState([]);
@@ -100,6 +108,25 @@ export default function Bingo({ room, me }) {
         socket.on('game_notification', handleNotification);
         return () => socket.off('game_notification', handleNotification);
     }, []);
+
+    // Voice Announcement Logic
+    useEffect(() => {
+        if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !isMuted) {
+            const utterance = new SpeechSynthesisUtterance(gameState.lastCalledNumber.toString());
+            utterance.rate = 1;
+            utterance.pitch = 1;
+            window.speechSynthesis.cancel(); // Cancel any ongoing speech
+            window.speechSynthesis.speak(utterance);
+        }
+    }, [gameState.lastCalledNumber, isMuted, gameState.status]);
+
+    const toggleMute = () => {
+        setIsMuted(prev => {
+            const newState = !prev;
+            localStorage.setItem('bingo_voice_muted', newState);
+            return newState;
+        });
+    };
 
     // Timer Logic
     useEffect(() => {
@@ -402,8 +429,8 @@ export default function Bingo({ room, me }) {
     const PlayerItem = ({ p }) => {
         const isTurn = gameState.players[gameState.turnIndex]?.id === p.id;
         return (
-            <TurnTimer isActive={isTurn} turnStartTime={gameState.turnStartTime} duration={gameState.turnDuration} style={{ position: 'relative', width: 'auto', height: 'auto', overflow: 'visible' }}>
-                <PlayerBubble player={p} isMe={p.id === me.id} roomId={room.id} isTurn={isTurn} stats={[{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters} /> }]} tags={p.status === 'WAITING' ? ['OFFLINE'] : []} />
+            <TurnTimer isActive={isTurn} turnStartTime={gameState.turnStartTime} duration={gameState.turnDuration} variant="bingo" style={{ position: 'relative', width: 'auto', height: 'auto', overflow: 'visible' }}>
+                <PlayerBubble player={p} isMe={p.id === me.id} roomId={room.id} isTurn={isTurn} variant="bingo" stats={[{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters} /> }]} tags={p.status === 'WAITING' ? ['OFFLINE'] : []} />
             </TurnTimer>
         );
     };
@@ -423,10 +450,26 @@ export default function Bingo({ room, me }) {
 
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
+        const bingoScores = (gameState.players || []).reduce((acc, p) => {
+            acc[p.id] = {
+                primary: p.claimedLetters?.length || 0,
+                secondary: p.lastClaimTime || 0,
+                display: p.claimedLetters?.length || 0
+            };
+            return acc;
+        }, {});
+
         const actions = (
             <Button variant="secondary" onClick={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}>BACK TO LOBBY</Button>
         );
-        gameOverNode = <GameOverOverlay winner={gameState.winner} players={gameState.players} scores={gameState.scores || {}} actions={actions} />;
+        gameOverNode = <GameOverOverlay
+            winner={gameState.winner}
+            players={gameState.players}
+            scores={bingoScores}
+            actions={actions}
+            scoreLabel="LETTERS CLAIMED"
+            sortOrder="desc"
+        />;
     }
 
     const getPhaseMessage = () => {
@@ -446,7 +489,21 @@ export default function Bingo({ room, me }) {
                     </div>
                     <div className="center-panel">
                         {gameState.status === 'SETUP' && !alreadySetUp && setupMode === 'CHOICE' && <SetupModal />}
-                        <div className="game-header" style={{ height: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        <div className="game-header" style={{ height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', position: 'relative' }}>
+                            <button
+                                className={`voice-mute-btn ${isMuted ? 'muted' : ''}`}
+                                onClick={toggleMute}
+                                title={isMuted ? "Unmute Voice" : "Mute Voice"}
+                            >
+                                {isMuted ? '🔇' : '🔊'}
+                            </button>
+                            {gameState.status === 'PLAYING' && (
+                                <TurnIndicator
+                                    isMyTurn={gameState.players[gameState.turnIndex]?.id === me.id}
+                                    playerName={gameState.players[gameState.turnIndex]?.name}
+                                    variant="bingo"
+                                />
+                            )}
                             <div className="phase-label" style={{ fontSize: '0.8rem', opacity: 0.8, letterSpacing: '1px' }}>{getPhaseMessage()}</div>
                             <div className="game-timer" style={{ fontSize: '2rem', fontWeight: '900', color: gameState.turnPhase === 'MARKING' ? '#ff5555' : '#FFD700', textShadow: '0 0 10px rgba(255,215,0,0.5)' }}>{timer}s</div>
                         </div>

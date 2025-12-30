@@ -6,13 +6,27 @@ export default function GameOverOverlay({
     players = [],
     scores = {}, // { playerId: value }
     actions,
-    title = "WINNER!"
+    title = "WINNER!",
+    scoreLabel = "SCORE",
+    sortOrder = 'asc' // 'asc' for small is better (Uno), 'desc' for big is better (Bingo)
 }) {
-    // Sort players by score (ascending usually for card games where points are bad, or descending for others)
-    // For now, let's just use the players array provided or derive from scores
     const sortedPlayers = [...players]
-        .map(p => ({ ...p, score: scores[p.id] || 0 }))
-        .sort((a, b) => a.score - b.score);
+        .map(p => {
+            const score = scores[p.id];
+            // If score is an object (for complex sorting), we'll handle it
+            const displayScore = (score && typeof score === 'object') ? score.display : (score || 0);
+            return { ...p, score: score || 0, displayScore };
+        })
+        .sort((a, b) => {
+            if (typeof a.score === 'object' && typeof b.score === 'object') {
+                // Complex sort (e.g. Bingo letters + timestamp)
+                if (a.score.primary !== b.score.primary) {
+                    return sortOrder === 'asc' ? a.score.primary - b.score.primary : b.score.primary - a.score.primary;
+                }
+                return a.score.secondary - b.score.secondary; // Earlier time is always better
+            }
+            return sortOrder === 'asc' ? a.score - b.score : b.score - a.score;
+        });
 
     return (
         <div className="modal-overlay game-over-overlay" style={{
@@ -45,9 +59,15 @@ export default function GameOverOverlay({
                 }}>{title}</h1>
 
                 {winner && (
-                    <div className="winner-section" style={{ marginBottom: '40px' }}>
-                        <PlayerAvatar name={winner.name} size="lg" style={{ margin: '0 auto 15px' }} />
-                        <h2 style={{ fontSize: '2rem' }}>{winner.name}</h2>
+                    <div className="winner-section" style={{
+                        marginBottom: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '20px'
+                    }}>
+                        <PlayerAvatar name={winner.name} size="lg" />
+                        <h2 style={{ fontSize: '2rem', margin: 0 }}>{winner.name}</h2>
                     </div>
                 )}
 
@@ -59,7 +79,7 @@ export default function GameOverOverlay({
                         borderRadius: '20px',
                         border: '1px solid rgba(255,255,255,0.1)'
                     }}>
-                        <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>SCORES</h3>
+                        <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>{scoreLabel}</h3>
                         {sortedPlayers.map((p, i) => (
                             <div key={p.id} style={{
                                 display: 'flex',
@@ -74,7 +94,7 @@ export default function GameOverOverlay({
                                     <span style={{ opacity: 0.5 }}>#{i + 1}</span>
                                     <span>{p.name}</span>
                                 </div>
-                                <span>{p.score}</span>
+                                <span>{p.displayScore}</span>
                             </div>
                         ))}
                     </div>

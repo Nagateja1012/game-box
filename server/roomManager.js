@@ -10,6 +10,14 @@ const GAME_REGISTRY = {
     'BINGO': BingoGame
 };
 
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 class RoomManager extends EventEmitter {
     constructor() {
         super();
@@ -130,6 +138,9 @@ class RoomManager extends EventEmitter {
         if (!GameClass) return { error: `${gameId} not found` };
 
         try {
+            // Shuffle players for universal random turn order and display
+            shuffleArray(room.players);
+
             room.game = new GameClass();
             if (room.game.init) {
                 room.game.init(room.players);

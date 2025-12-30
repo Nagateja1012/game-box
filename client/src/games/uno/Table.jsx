@@ -2,6 +2,7 @@ import React from 'react';
 import Card from './Card';
 import PlayerBubble from '../../design-system/PlayerBubble';
 import TurnTimer from '../../design-system/TurnTimer';
+import TurnIndicator from '../../design-system/TurnIndicator';
 
 export default function Table({
     players,
@@ -95,6 +96,7 @@ export default function Table({
                             key={player.id}
                             isActive={isTurn}
                             turnStartTime={turnStartTime}
+                            variant="cards"
                             style={style}
                         >
                             <PlayerBubble
@@ -102,6 +104,7 @@ export default function Table({
                                 isMe={false}
                                 roomId={roomId}
                                 isTurn={isTurn}
+                                variant="cards"
                                 stats={[{ icon: '🎴', value: player.cardCount }]}
                                 tags={player.isUno ? ['UNO!'] : []}
                             />
@@ -128,12 +131,14 @@ export default function Table({
                                 <TurnTimer
                                     isActive={isMyTurn}
                                     turnStartTime={turnStartTime}
+                                    variant="cards"
                                 >
                                     <PlayerBubble
                                         player={myPlayer}
                                         isMe={true}
                                         roomId={roomId}
                                         isTurn={isMyTurn}
+                                        variant="cards"
                                         stats={[{ icon: '🎴', value: myPlayer.cardCount }]}
                                         tags={myPlayer.isUno ? ['UNO!'] : []}
                                     />
@@ -155,20 +160,18 @@ export default function Table({
                 zIndex: 5
             }}>
                 {showTurnIndicator && (
-                    <div className="turn-indicator-modern" style={{
-                        background: players[turnIndex]?.id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.8)',
+                    <div style={{
                         position: 'absolute',
                         top: '-50px',
-                        padding: '8px 25px',
-                        borderRadius: '50px',
-                        whiteSpace: 'nowrap',
-                        fontWeight: '800',
-                        fontSize: '1rem',
-                        border: players[turnIndex]?.id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                        animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10
                     }}>
-                        {players[turnIndex]?.id === me.id ? 'YOUR TURN' : `${players[turnIndex]?.name.toUpperCase()}'S TURN`}
+                        <TurnIndicator
+                            isMyTurn={players[turnIndex]?.id === me.id}
+                            playerName={players[turnIndex]?.name}
+                            variant="cards"
+                        />
                     </div>
                 )}
 
