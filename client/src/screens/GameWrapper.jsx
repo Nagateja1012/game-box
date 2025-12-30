@@ -20,16 +20,22 @@ export default function GameWrapper({ room, me, children, playScreen, playerHand
         if (!text) return null;
 
         return text.split('\n').map((line, i) => {
+            const trimmedLine = line.trim();
+            if (trimmedLine === '') return <br key={i} />;
+
             // Headings
-            if (line.startsWith('# ')) {
-                return <h2 key={i} style={{ marginTop: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>{line.slice(2)}</h2>;
+            if (trimmedLine.startsWith('# ')) {
+                return <h2 key={i} style={{ marginTop: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '10px' }}>{trimmedLine.slice(2)}</h2>;
             }
-            if (line.startsWith('## ')) {
-                return <h3 key={i} style={{ marginTop: '15px' }}>{line.slice(3)}</h3>;
+            if (trimmedLine.startsWith('## ')) {
+                return <h3 key={i} style={{ marginTop: '15px' }}>{trimmedLine.slice(3)}</h3>;
             }
 
+            const isBullet = trimmedLine.startsWith('- ');
+            const lineToProcess = isBullet ? trimmedLine.slice(2) : trimmedLine;
+
             // Bold text (**text**)
-            const parts = line.split(/(\*\*.*?\*\*)/g);
+            const parts = lineToProcess.split(/(\*\*.*?\*\*)/g);
             const content = parts.map((part, j) => {
                 if (part.startsWith('**') && part.endsWith('**')) {
                     return <strong key={j}>{part.slice(2, -2)}</strong>;
@@ -38,17 +44,17 @@ export default function GameWrapper({ room, me, children, playScreen, playerHand
             });
 
             // Bullet points
-            if (line.trim().startsWith('- ')) {
+            if (isBullet) {
                 return (
                     <div key={i} style={{ display: 'flex', gap: '10px', marginBottom: '8px', paddingLeft: '10px' }}>
-                        <span>•</span>
+                        <span style={{ color: '#06b6d4' }}>•</span>
                         <span>{content}</span>
                     </div>
                 );
             }
 
             // Regular paragraphs
-            return line.trim() === '' ? <br key={i} /> : <p key={i} style={{ marginBottom: '10px' }}>{content}</p>;
+            return <p key={i} style={{ marginBottom: '10px' }}>{content}</p>;
         });
     };
 

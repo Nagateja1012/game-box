@@ -27,6 +27,12 @@ When a **Wild** or **+4** card is played, the player must select a color before 
 - Clicking UNO shows a notification to all players.
 - If you click UNO and then draw a card, there is no penalty.
 
+## 📝 Penalties
+
+- If you do not click UNO and play a card, 2 cards are added to your hand.
+- If you dont play a card within time limit, you chance is skipped and 1 card is added to your hand.
+- If you dont play a card within time limit when (+2 or greater) is played, you chance is skipped and (+2 or greater) + 1 cards are added to your hand.
+
 ## 🏁 Winning the Game
 
 A player wins by playing their last card, which **cannot** be a Wild or +4.

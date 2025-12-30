@@ -22,6 +22,7 @@ class UnoGame {
         this.turnTimer = null;
         this.onTurnTimeout = null; // Callback for when turn times out
         this.onStateChange = null; // Callback for when game state changes internally
+        this.lastSkip = null; // { playerId, reason, timestamp }
     }
 
     // Initialize game with players
@@ -165,11 +166,26 @@ class UnoGame {
             logger.info(`Turn timeout for player ${currentPlayer.name}`);
 
             // Auto-pass or auto-draw then pass
-            if (currentPlayer.hasDrawn || this.drawStack > 0) {
-                // If already drawn or facing a stack, just pass
+            if (this.drawStack > 0) {
+                // If facing a stack, draw the whole stack plus one penalty card, then advance turn
+                const totalToDraw = this.drawStack + 1;
+                for (let i = 0; i < totalToDraw; i++) {
+                    const card = this.drawCard();
+                    if (card) currentPlayer.hand.push(card);
+                }
+                logger.info(`Turn timeout for ${currentPlayer.name}: drew ${totalToDraw} cards (${this.drawStack} from stack + 1 penalty)`);
+                this.drawStack = 0;
+                this.stackType = null;
+                currentPlayer.hasDrawn = false;
+                this.lastSkip = { playerId: currentPlayer.id, reason: 'TIMEOUT', timestamp: Date.now() };
+                this.advanceTurn();
+                this.startTurnTimer();
+            } else if (currentPlayer.hasDrawn) {
+                // If already drawn, just pass
                 this.passTurn(this.turnIndex);
             } else {
-                // Draw a card first, then pass
+                // Normal timeout: Draw a card first, then pass
+                this.lastSkip = { playerId: currentPlayer.id, reason: 'TIMEOUT', timestamp: Date.now() };
                 this.playerDrawCard(this.turnIndex);
                 this.passTurn(this.turnIndex);
             }
@@ -386,8 +402,12 @@ class UnoGame {
     }
 
     advanceTurn(skip = false) {
-        this.turnIndex = this.getNextPlayerIndex();
         if (skip) {
+            const skippedPlayer = this.players[this.getNextPlayerIndex()];
+            this.lastSkip = { playerId: skippedPlayer.id, reason: 'CARD', timestamp: Date.now() };
+            this.turnIndex = this.getNextPlayerIndex();
+            this.turnIndex = this.getNextPlayerIndex();
+        } else {
             this.turnIndex = this.getNextPlayerIndex();
         }
 
@@ -416,6 +436,8 @@ class UnoGame {
             scores: this.scores,
             lastUnoShout: this.lastUnoShout,
             drawStack: this.drawStack,
+            stackType: this.stackType,
+            lastSkip: this.lastSkip,
             // Turn timer info for client synchronization (primitives only, no timer object)
             turnStartTime: this.turnStartTime,
             turnDuration: this.turnDuration,
@@ -476,6 +498,11 @@ class UnoGame {
         this.startTurnTimer();
 
         return false; // Game continues
+    }
+
+    stop() {
+        this.clearTurnTimer();
+        this.gameStatus = 'ENDED';
     }
 }
 

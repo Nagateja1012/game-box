@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
 
 const logger = require('./utils/logger');
+const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 
 const GAME_REGISTRY = {
     'UNO': UnoGame
@@ -14,23 +15,45 @@ class RoomManager extends EventEmitter {
         this.disconnectionTimers = new Map(); // userId -> timeoutId
         this.DISCONNECT_TIMEOUT = 30000; // 30 seconds
         this.MAX_PLAYERS = 12;
+        this.IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+        this.MAX_ROOM_DURATION = 120 * 60 * 1000; // 120 minutes
+
+        // Start background cleanup
+        this.cleanupInterval = setInterval(() => this.checkRoomTimeouts(), 60000); // Every minute
+    }
+
+    _sanitizeRoomId(roomId) {
+        return sanitize(roomId, { maxLength: 6, allowedType: VALIDATION_TYPES.ALPHANUMERIC }).toUpperCase();
+    }
+
+    updateActivity(roomId) {
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
+        if (room) {
+            room.lastActivity = Date.now();
+        }
     }
 
     createRoom(hostId, hostName, userId) {
         const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const cleanHostName = sanitize(hostName, { maxLength: 20 });
+
         this.rooms.set(roomId, {
             id: roomId,
-            players: [{ id: hostId, name: hostName, isHost: true, userId, connected: true, status: 'WAITING' }],
+            players: [{ id: hostId, name: cleanHostName, isHost: true, userId, connected: true, status: 'WAITING' }],
             gameState: null,
             game: null, // The active game instance
-            status: 'LOBBY' // LOBBY, PLAYING
+            status: 'LOBBY', // LOBBY, PLAYING
+            createdAt: Date.now(),
+            lastActivity: Date.now()
         });
         logger.info(`Room created: ${roomId} by ${hostName} (${hostId})`);
         return roomId;
     }
 
     joinRoom(roomId, playerId, playerName, userId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         // Check if player already in room (reconnect?)
@@ -71,15 +94,17 @@ class RoomManager extends EventEmitter {
                 return { error: `Room is full (max ${this.MAX_PLAYERS} players)` };
             }
             // Check if name is taken? (Optional, but good practice)
-            room.players.push({ id: playerId, name: playerName, isHost: false, userId, connected: true, status: 'WAITING' });
-            logger.info(`Player ${playerName} (${playerId}) joined room ${roomId}`);
+            const cleanPlayerName = sanitize(playerName, { maxLength: 10 });
+            room.players.push({ id: playerId, name: cleanPlayerName, isHost: false, userId, connected: true, status: 'WAITING' });
+            logger.info(`Player ${cleanPlayerName} (${playerId}) joined room ${roomId}`);
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
     getRoom(roomId) {
-        return this.rooms.get(roomId);
+        return this.rooms.get(this._sanitizeRoomId(roomId));
     }
 
 
@@ -95,7 +120,8 @@ class RoomManager extends EventEmitter {
     }
 
     startGame(roomId, gameId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const GameClass = GAME_REGISTRY[gameId];
@@ -122,11 +148,13 @@ class RoomManager extends EventEmitter {
             return { error: 'Failed to start game' };
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
     stopGame(roomId, hostId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const player = room.players.find(p => p.id === hostId);
@@ -138,11 +166,13 @@ class RoomManager extends EventEmitter {
         room.players.forEach(p => p.status = 'WAITING');
         logger.info(`Game stopped in room ${roomId} by host`);
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
     leaveGame(roomId, playerId, userId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const player = room.players.find(p => p.id === playerId || (userId && p.userId === userId));
@@ -169,7 +199,8 @@ class RoomManager extends EventEmitter {
     }
 
     handleGameAction(roomId, playerId, action) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room || !room.game) return { error: 'Game not active' };
 
         const player = room.players.find(p => p.id === playerId);
@@ -179,6 +210,7 @@ class RoomManager extends EventEmitter {
             const changed = room.game.handleAction(action, player);
             if (changed) {
                 room.gameState = room.game.getState();
+                this.updateActivity(roomId);
                 return { room: this.getSerializableRoom(room) };
             }
         } catch (error) {
@@ -251,6 +283,38 @@ class RoomManager extends EventEmitter {
             }
         }
         return null;
+    }
+
+    checkRoomTimeouts() {
+        const now = Date.now();
+        for (const [roomId, room] of this.rooms.entries()) {
+            const isIdle = now - room.lastActivity > this.IDLE_TIMEOUT;
+            const isExpired = now - room.createdAt > this.MAX_ROOM_DURATION;
+
+            if (isIdle || isExpired) {
+                const reason = isIdle ? 'IDLE' : 'EXPIRED';
+                logger.info(`Closing room ${roomId} due to ${reason}`);
+
+                // Emit event for socketHandlers to broadcast
+                this.emit('room_closed', roomId, { reason });
+
+                // Explicitly stop any active game (clears timers)
+                if (room.game && room.game.stop) {
+                    room.game.stop();
+                }
+
+                // Cleanup
+                this.rooms.delete(roomId);
+
+                // Clear any pending disconnect timers for players in this room
+                room.players.forEach(p => {
+                    if (p.userId && this.disconnectionTimers.has(p.userId)) {
+                        clearTimeout(this.disconnectionTimers.get(p.userId));
+                        this.disconnectionTimers.delete(p.userId);
+                    }
+                });
+            }
+        }
     }
 }
 

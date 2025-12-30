@@ -7,6 +7,7 @@ import './uno.css';
 import Button from '../../design-system/Button';
 import GameOverOverlay from '../../design-system/GameOverOverlay';
 import GameWrapper from '../../screens/GameWrapper';
+import PopNotification from '../../design-system/PopNotification';
 
 export default function Uno({ room, me }) {
     const { gameState } = room;
@@ -14,8 +15,11 @@ export default function Uno({ room, me }) {
     const [pendingCard, setPendingCard] = useState(null);
     const [unoPopUp, setUnoPopUp] = useState(null);
     const [muted, setMuted] = useState(true);
+    const [showInvalidMove, setShowInvalidMove] = useState(false);
+    const [skipPopUp, setSkipPopUp] = useState(null);
 
-    const lastProcessedShoutTime = React.useRef(0);
+    const lastProcessedShoutTime = React.useRef(gameState.lastUnoShout?.time || 0);
+    const lastProcessedSkipTime = React.useRef(gameState.lastSkip?.timestamp || 0);
     const prevTurnIndex = React.useRef(gameState.turnIndex);
     const prevGameStatus = React.useRef(gameState.gameStatus);
 
@@ -42,14 +46,45 @@ export default function Uno({ room, me }) {
     }, [gameState.gameStatus, gameState.turnIndex]);
 
     useEffect(() => {
-        if (gameState.lastUnoShout && gameState.lastUnoShout.time > lastProcessedShoutTime.current) {
-            setUnoPopUp(gameState.lastUnoShout);
-            lastProcessedShoutTime.current = gameState.lastUnoShout.time;
-            soundManager.playUnoShout();
-            const timer = setTimeout(() => setUnoPopUp(null), 2000);
-            return () => clearTimeout(timer);
+        const shout = gameState.lastUnoShout;
+        if (shout && shout.time > lastProcessedShoutTime.current) {
+            // Only show if the shout is very recent (within 5 seconds) to avoid historical popups on join
+            const isRecent = Date.now() - shout.time < 5000;
+
+            if (isRecent) {
+                setUnoPopUp(shout);
+                soundManager.playUnoShout();
+                const timer = setTimeout(() => setUnoPopUp(null), 2000);
+                lastProcessedShoutTime.current = shout.time;
+                return () => clearTimeout(timer);
+            } else {
+                // If not recent, just update the ref to keep it quiet
+                lastProcessedShoutTime.current = shout.time;
+            }
         }
     }, [gameState.lastUnoShout?.time]);
+
+    useEffect(() => {
+        if (showInvalidMove) {
+            const timer = setTimeout(() => setShowInvalidMove(false), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [showInvalidMove]);
+
+    useEffect(() => {
+        const skip = gameState.lastSkip;
+        if (skip && skip.timestamp > lastProcessedSkipTime.current) {
+            const isRecent = Date.now() - skip.timestamp < 5000;
+
+            if (isRecent && skip.playerId === me.id) {
+                setSkipPopUp(skip);
+                const timer = setTimeout(() => setSkipPopUp(null), 1500);
+                lastProcessedSkipTime.current = skip.timestamp;
+                return () => clearTimeout(timer);
+            }
+            lastProcessedSkipTime.current = skip.timestamp;
+        }
+    }, [gameState.lastSkip?.timestamp, me.id]);
 
     // Safety check
     if (!gameState || !gameState.players) {
@@ -60,8 +95,28 @@ export default function Uno({ room, me }) {
     const mePlayer = gameState.players.find(p => p.id === me.id);
     const isMyTurn = gameState.players[gameState.turnIndex]?.id === me.id;
 
+    const isValidMove = (card, topCard, drawStack, stackType, currentColor) => {
+        // Stacking Logic
+        if (drawStack > 0) {
+            if (stackType === 'DRAW_TWO' && card.value === 'DRAW_TWO') return true;
+            if (stackType === 'WILD_DRAW_FOUR' && card.value === 'WILD_DRAW_FOUR') return true;
+            return false;
+        }
+
+        if (card.color === 'BLACK') return true; // Wilds always playable
+        if (card.color === currentColor) return true; // Match color
+        if (card.value === topCard.value) return true; // Match value
+        return false;
+    };
+
     const handlePlayCard = (card) => {
         if (!isMyTurn) return;
+
+        // Client-side validation
+        if (!isValidMove(card, gameState.topCard, gameState.drawStack, gameState.stackType, gameState.currentColor)) {
+            setShowInvalidMove(true);
+            return;
+        }
 
         if (card.color === 'BLACK') {
             setPendingCard(card);
@@ -190,7 +245,28 @@ export default function Uno({ room, me }) {
                         turnStartTime={gameState.turnStartTime}
                         roomId={room.id}
                         turnDuration={gameState.turnDuration}
+                        drawStack={gameState.drawStack}
                     />
+
+                    <PopNotification
+                        show={showInvalidMove}
+                        text="INVALID CARD"
+                    />
+
+                    <PopNotification
+                        show={!!skipPopUp}
+                        text="SKIPPED!"
+                        color="var(--accent-turn)"
+                    />
+
+                    <PopNotification
+                        show={!!unoPopUp}
+                        text="UNO!"
+                        className="uno-popup-animation"
+                        style={{ fontSize: '5rem', padding: '40px 80px' }}
+                    >
+                        <div className="shouter-name">{unoPopUp?.name}</div>
+                    </PopNotification>
 
                     {isMyTurn && mePlayer?.hasDrawn && (
                         <Button
@@ -213,16 +289,6 @@ export default function Uno({ room, me }) {
                         </Button>
                     )}
 
-                    {gameState.drawStack > 0 && (
-                        <div style={{
-                            position: 'absolute', top: '70%', left: '50%',
-                            transform: 'translate(-50%, -50%)', color: '#ff4444',
-                            fontSize: '1.8em', fontWeight: 'bold',
-                            pointerEvents: 'none', zIndex: 20, letterSpacing: '2px'
-                        }}>
-                            STACK: +{gameState.drawStack}
-                        </div>
-                    )}
 
                     {showUnoButton && (
                         <button className="uno-button" onClick={handleUnoShout} style={{ bottom: '20px' }}>
@@ -244,12 +310,6 @@ export default function Uno({ room, me }) {
                         </div>
                     )}
 
-                    {unoPopUp && (
-                        <div className="uno-popup-animation">
-                            UNO!
-                            <div className="shouter-name">{unoPopUp.name}</div>
-                        </div>
-                    )}
                 </div>
             }
             playerHand={

@@ -1,6 +1,7 @@
 import React from 'react';
 import { socket } from '../socket';
 import { GAME_METADATA } from '../games/registry';
+import SanitizedInput, { VALIDATION_TYPES } from '../design-system/SanitizedInput';
 
 export default function Lobby({ room, me }) {
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -174,11 +175,13 @@ export default function Lobby({ room, me }) {
                                     <span style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))' }}>🎲</span>
                                 </button>
                             )}
-                            <input
+                            <SanitizedInput
                                 type="text"
                                 placeholder="Search..."
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={(val) => setSearchQuery(val)}
+                                allowedType={VALIDATION_TYPES.ALPHANUMERIC}
+                                maxLength={30}
                                 style={{
                                     padding: '8px 14px',
                                     borderRadius: '18px',

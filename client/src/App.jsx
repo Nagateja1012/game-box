@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { socket } from './socket';
 import { GAME_METADATA } from './games/registry';
 import Home from './screens/Home';
@@ -25,6 +25,34 @@ function App() {
   const [error, setError] = useState('');
   const [isCreatingRoom, setIsCreatingRoom] = useState(false);
 
+  const screenRef = useRef(currentScreen);
+  useEffect(() => {
+    screenRef.current = currentScreen;
+  }, [currentScreen]);
+
+  const handleExitRoom = (keepError = false) => {
+    setRoomData(null);
+    setCurrentScreen('HOME');
+    localStorage.removeItem('room_id');
+    if (!keepError) setError('');
+
+    // Clear room code from URL
+    const url = new URL(window.location.href);
+    url.searchParams.delete('room');
+    window.history.replaceState({}, '', url.pathname + url.search);
+  };
+
+  const handleLogin = (name) => {
+    setPlayerData(prev => ({ ...prev, name }));
+    localStorage.setItem('player_name', name);
+  };
+
+  const createRoom = () => {
+    if (!playerData.name) return setError('Please enter a nickname');
+    setIsCreatingRoom(true); // Start loading
+    socket.emit('create_room', { playerName: playerData.name, userId: playerData.userId });
+  };
+
   useEffect(() => {
     function onConnect() {
       setIsConnected(true);
@@ -40,7 +68,13 @@ function App() {
       // until onRoomUpdated is called
     }
 
+    let fallbackTimer = null;
+
     function onRoomUpdated(room) {
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
       // Add null check to prevent errors
       if (!room) {
         console.warn('Received null/undefined room in room_updated event');
@@ -67,23 +101,37 @@ function App() {
     }
 
     function onLeftRoom() {
-      setRoomData(null);
-      setCurrentScreen('HOME');
-      localStorage.removeItem('room_id');
+      handleExitRoom();
+    }
 
-      // Clear room code from URL
-      const url = new URL(window.location.href);
-      url.searchParams.delete('room');
-      window.history.replaceState({}, '', url.pathname + url.search);
+    function onRoomClosed({ reason }) {
+      const messages = {
+        'IDLE': 'Room closed due to 30 minutes of inactivity.',
+        'EXPIRED': 'Room closed: Maximum duration (120 minutes) reached.'
+      };
 
-      setError('');
+      const msg = messages[reason] || 'Room has been closed by the server.';
+      setError(msg);
+      handleExitRoom(true); // true to keep the error message visible
+      setTimeout(() => setError(''), 10000); // persistent for 10s
     }
 
     function onError(msg) {
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
       console.error("Socket Error:", msg);
       setError(typeof msg === 'string' ? msg : 'An error occurred');
       setIsCreatingRoom(false); // Reset on error
-      setTimeout(() => setError(''), 5000);
+
+      // If room is not found while restoring or joining, clear session but KEEP the error visible
+      if (typeof msg === 'string' && (msg.toLowerCase().includes('not found') || msg.toLowerCase().includes('terminated'))) {
+        handleExitRoom(true);
+        setTimeout(() => setError(''), 5000);
+      } else {
+        setTimeout(() => setError(''), 5000);
+      }
     }
 
     function onConnectError(err) {
@@ -96,6 +144,7 @@ function App() {
     socket.on('room_created', onRoomCreated);
     socket.on('room_updated', onRoomUpdated);
     socket.on('left_room', onLeftRoom);
+    socket.on('room_closed', onRoomClosed);
     socket.on('error', onError);
     socket.on('connect_error', onConnectError);
 
@@ -108,17 +157,22 @@ function App() {
       console.log("Attempting to reconnect to room:", savedRoomId);
       socket.emit('join_room', { roomId: savedRoomId, playerName: playerData.name, userId: playerData.userId });
 
-      // Safety fallback: if no room_updated after 5 seconds, go home
-      const timer = setTimeout(() => {
-        setCurrentScreen(prev => prev === 'RESTORING' ? 'HOME' : prev);
+      // Safety fallback: if no room_updated after 5 seconds, go home and clear session
+      fallbackTimer = setTimeout(() => {
+        if (screenRef.current === 'RESTORING') {
+          setError('Room connection timed out. Please try again.');
+          handleExitRoom(true);
+          setTimeout(() => setError(''), 5000);
+        }
       }, 5000);
       return () => {
-        clearTimeout(timer);
+        if (fallbackTimer) clearTimeout(fallbackTimer);
         socket.off('connect', onConnect);
         socket.off('disconnect', onDisconnect);
         socket.off('room_created', onRoomCreated);
         socket.off('room_updated', onRoomUpdated);
         socket.off('left_room', onLeftRoom);
+        socket.off('room_closed', onRoomClosed);
         socket.on('error', onError);
         socket.off('connect_error', onConnectError);
         socket.disconnect();
@@ -131,6 +185,7 @@ function App() {
       socket.off('room_created', onRoomCreated);
       socket.off('room_updated', onRoomUpdated);
       socket.off('left_room', onLeftRoom);
+      socket.off('room_closed', onRoomClosed);
       socket.off('error', onError);
       socket.off('connect_error', onConnectError);
       socket.disconnect();
@@ -148,16 +203,6 @@ function App() {
     }
   }, [currentScreen, roomData]);
 
-  const handleLogin = (name) => {
-    setPlayerData(prev => ({ ...prev, name }));
-    localStorage.setItem('player_name', name);
-  };
-
-  const createRoom = () => {
-    if (!playerData.name) return setError('Please enter a nickname');
-    setIsCreatingRoom(true); // Start loading
-    socket.emit('create_room', { playerName: playerData.name, userId: playerData.userId });
-  };
 
   const joinRoom = (roomId) => {
     if (!playerData.name) return setError('Please enter a nickname');
@@ -177,7 +222,7 @@ function App() {
             <button
               className="btn btn-secondary"
               style={{ marginTop: '30px', fontSize: '0.8rem' }}
-              onClick={() => setCurrentScreen('HOME')}
+              onClick={handleExitRoom}
             >
               Back to Home
             </button>
