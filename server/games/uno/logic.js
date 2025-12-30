@@ -429,6 +429,7 @@ class UnoGame {
             scores: this.scores,
             lastUnoShout: this.lastUnoShout,
             drawStack: this.drawStack,
+            stackType: this.stackType,
             // Turn timer info for client synchronization (primitives only, no timer object)
             turnStartTime: this.turnStartTime,
             turnDuration: this.turnDuration,

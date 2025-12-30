@@ -7,6 +7,7 @@ import './uno.css';
 import Button from '../../design-system/Button';
 import GameOverOverlay from '../../design-system/GameOverOverlay';
 import GameWrapper from '../../screens/GameWrapper';
+import PopNotification from '../../design-system/PopNotification';
 
 export default function Uno({ room, me }) {
     const { gameState } = room;
@@ -14,6 +15,7 @@ export default function Uno({ room, me }) {
     const [pendingCard, setPendingCard] = useState(null);
     const [unoPopUp, setUnoPopUp] = useState(null);
     const [muted, setMuted] = useState(true);
+    const [showInvalidMove, setShowInvalidMove] = useState(false);
 
     const lastProcessedShoutTime = React.useRef(0);
     const prevTurnIndex = React.useRef(gameState.turnIndex);
@@ -51,6 +53,13 @@ export default function Uno({ room, me }) {
         }
     }, [gameState.lastUnoShout?.time]);
 
+    useEffect(() => {
+        if (showInvalidMove) {
+            const timer = setTimeout(() => setShowInvalidMove(false), 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [showInvalidMove]);
+
     // Safety check
     if (!gameState || !gameState.players) {
         return <div className="loading-container">Loading game state...</div>;
@@ -60,8 +69,28 @@ export default function Uno({ room, me }) {
     const mePlayer = gameState.players.find(p => p.id === me.id);
     const isMyTurn = gameState.players[gameState.turnIndex]?.id === me.id;
 
+    const isValidMove = (card, topCard, drawStack, stackType, currentColor) => {
+        // Stacking Logic
+        if (drawStack > 0) {
+            if (stackType === 'DRAW_TWO' && card.value === 'DRAW_TWO') return true;
+            if (stackType === 'WILD_DRAW_FOUR' && card.value === 'WILD_DRAW_FOUR') return true;
+            return false;
+        }
+
+        if (card.color === 'BLACK') return true; // Wilds always playable
+        if (card.color === currentColor) return true; // Match color
+        if (card.value === topCard.value) return true; // Match value
+        return false;
+    };
+
     const handlePlayCard = (card) => {
         if (!isMyTurn) return;
+
+        // Client-side validation
+        if (!isValidMove(card, gameState.topCard, gameState.drawStack, gameState.stackType, gameState.currentColor)) {
+            setShowInvalidMove(true);
+            return;
+        }
 
         if (card.color === 'BLACK') {
             setPendingCard(card);
@@ -192,6 +221,20 @@ export default function Uno({ room, me }) {
                         turnDuration={gameState.turnDuration}
                     />
 
+                    <PopNotification
+                        show={showInvalidMove}
+                        text="INVALID CARD"
+                    />
+
+                    <PopNotification
+                        show={!!unoPopUp}
+                        text="UNO!"
+                        className="uno-popup-animation"
+                        style={{ fontSize: '5rem', padding: '40px 80px' }}
+                    >
+                        <div className="shouter-name">{unoPopUp?.name}</div>
+                    </PopNotification>
+
                     {isMyTurn && mePlayer?.hasDrawn && (
                         <Button
                             variant="secondary"
@@ -244,12 +287,6 @@ export default function Uno({ room, me }) {
                         </div>
                     )}
 
-                    {unoPopUp && (
-                        <div className="uno-popup-animation">
-                            UNO!
-                            <div className="shouter-name">{unoPopUp.name}</div>
-                        </div>
-                    )}
                 </div>
             }
             playerHand={
