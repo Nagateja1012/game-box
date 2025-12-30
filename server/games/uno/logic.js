@@ -22,6 +22,7 @@ class UnoGame {
         this.turnTimer = null;
         this.onTurnTimeout = null; // Callback for when turn times out
         this.onStateChange = null; // Callback for when game state changes internally
+        this.lastSkip = null; // { playerId, reason, timestamp }
     }
 
     // Initialize game with players
@@ -176,6 +177,7 @@ class UnoGame {
                 this.drawStack = 0;
                 this.stackType = null;
                 currentPlayer.hasDrawn = false;
+                this.lastSkip = { playerId: currentPlayer.id, reason: 'TIMEOUT', timestamp: Date.now() };
                 this.advanceTurn();
                 this.startTurnTimer();
             } else if (currentPlayer.hasDrawn) {
@@ -183,6 +185,7 @@ class UnoGame {
                 this.passTurn(this.turnIndex);
             } else {
                 // Normal timeout: Draw a card first, then pass
+                this.lastSkip = { playerId: currentPlayer.id, reason: 'TIMEOUT', timestamp: Date.now() };
                 this.playerDrawCard(this.turnIndex);
                 this.passTurn(this.turnIndex);
             }
@@ -399,8 +402,12 @@ class UnoGame {
     }
 
     advanceTurn(skip = false) {
-        this.turnIndex = this.getNextPlayerIndex();
         if (skip) {
+            const skippedPlayer = this.players[this.getNextPlayerIndex()];
+            this.lastSkip = { playerId: skippedPlayer.id, reason: 'CARD', timestamp: Date.now() };
+            this.turnIndex = this.getNextPlayerIndex();
+            this.turnIndex = this.getNextPlayerIndex();
+        } else {
             this.turnIndex = this.getNextPlayerIndex();
         }
 
@@ -430,6 +437,7 @@ class UnoGame {
             lastUnoShout: this.lastUnoShout,
             drawStack: this.drawStack,
             stackType: this.stackType,
+            lastSkip: this.lastSkip,
             // Turn timer info for client synchronization (primitives only, no timer object)
             turnStartTime: this.turnStartTime,
             turnDuration: this.turnDuration,

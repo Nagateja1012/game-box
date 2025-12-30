@@ -16,8 +16,10 @@ export default function Uno({ room, me }) {
     const [unoPopUp, setUnoPopUp] = useState(null);
     const [muted, setMuted] = useState(true);
     const [showInvalidMove, setShowInvalidMove] = useState(false);
+    const [skipPopUp, setSkipPopUp] = useState(null);
 
     const lastProcessedShoutTime = React.useRef(0);
+    const lastProcessedSkipTime = React.useRef(0);
     const prevTurnIndex = React.useRef(gameState.turnIndex);
     const prevGameStatus = React.useRef(gameState.gameStatus);
 
@@ -59,6 +61,18 @@ export default function Uno({ room, me }) {
             return () => clearTimeout(timer);
         }
     }, [showInvalidMove]);
+
+    useEffect(() => {
+        if (gameState.lastSkip && gameState.lastSkip.timestamp > lastProcessedSkipTime.current) {
+            if (gameState.lastSkip.playerId === me.id) {
+                setSkipPopUp(gameState.lastSkip);
+                const timer = setTimeout(() => setSkipPopUp(null), 1500);
+                lastProcessedSkipTime.current = gameState.lastSkip.timestamp;
+                return () => clearTimeout(timer);
+            }
+            lastProcessedSkipTime.current = gameState.lastSkip.timestamp;
+        }
+    }, [gameState.lastSkip?.timestamp, me.id]);
 
     // Safety check
     if (!gameState || !gameState.players) {
@@ -224,6 +238,12 @@ export default function Uno({ room, me }) {
                     <PopNotification
                         show={showInvalidMove}
                         text="INVALID CARD"
+                    />
+
+                    <PopNotification
+                        show={!!skipPopUp}
+                        text="SKIPPED!"
+                        color="var(--accent-turn)"
                     />
 
                     <PopNotification
