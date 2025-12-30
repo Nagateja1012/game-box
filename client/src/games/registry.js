@@ -1,10 +1,11 @@
 import Uno from './uno';
+import Bingo from './bingo';
 import { UNO_RULES } from './uno/rules';
 
 
 export const GAME_REGISTRY = {
-    'UNO': Uno
-
+    'UNO': Uno,
+    'BINGO': Bingo
 };
 
 export const GAME_METADATA = {

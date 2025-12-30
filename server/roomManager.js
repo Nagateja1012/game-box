@@ -1,11 +1,13 @@
 const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
+const BingoGame = require('./games/bingo/logic');
 
 const logger = require('./utils/logger');
 const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 
 const GAME_REGISTRY = {
-    'UNO': UnoGame
+    'UNO': UnoGame,
+    'BINGO': BingoGame
 };
 
 class RoomManager extends EventEmitter {
