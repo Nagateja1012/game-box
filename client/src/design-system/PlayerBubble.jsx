@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PlayerAvatar from './PlayerAvatar';
 import { socket } from '../socket';
 
 const EMOTES = ['😂', '❤️', '😏', '😑', '😭'];
 
-export default function PlayerBubble({
+const PlayerBubble = React.memo(({
     player,
     isMe = false,
     roomId = null,
@@ -14,9 +14,12 @@ export default function PlayerBubble({
     className = '',
     style = {},
     variant = 'cards' // 'cards' (Uno), 'bingo' (Bingo badge)
-}) {
+}) => {
     const [isHovered, setIsHovered] = useState(false);
+    const [selectorSide, setSelectorSide] = useState('top');
     const [activeEmote, setActiveEmote] = useState(null);
+    const hoverTimeoutRef = useRef(null);
+    const containerRef = useRef(null);
 
     useEffect(() => {
         let timer;
@@ -38,13 +41,36 @@ export default function PlayerBubble({
     const handleSendEmote = (emote) => {
         if (!isMe || !roomId) return;
         socket.emit('send_emote', { roomId, emote });
+        // Hide selector after sending
+        setIsHovered(false);
+    };
+
+    const onMouseEnter = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+
+        // Dynamic position detection
+        if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            // If there's less than 120px above the bubble, show at bottom
+            setSelectorSide(rect.top < 120 ? 'bottom' : 'top');
+        }
+
+        setIsHovered(true);
+    };
+
+    const onMouseLeave = () => {
+        // Add a larger buffer (300ms) before hiding to handle jitter/refresh
+        hoverTimeoutRef.current = setTimeout(() => {
+            setIsHovered(false);
+        }, 300);
     };
 
     return (
         <div
+            ref={containerRef}
             className={`player-bubble ${isTurn ? 'active' : ''} ${variant} ${className}`}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseEnter={onMouseEnter}
+            onMouseLeave={onMouseLeave}
             style={{
                 display: 'flex',
                 flexDirection: variant === 'bingo' ? 'row' : 'column',
@@ -64,7 +90,7 @@ export default function PlayerBubble({
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 cursor: isMe ? 'pointer' : 'default',
                 pointerEvents: 'auto',
-                zIndex: isHovered ? 300 : 'auto',
+                zIndex: isHovered ? 450 : 200, // Elevated while hovered
                 ...style
             }}
         >
@@ -72,66 +98,13 @@ export default function PlayerBubble({
             {activeEmote && (
                 <div style={{
                     position: 'absolute',
-                    top: '-30px',
-                    fontSize: '1.8rem',
+                    top: '-40px',
+                    fontSize: '2.5rem',
                     animation: 'emotePop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, emoteFloat 2s ease-out 0.5s infinite',
-                    zIndex: 400,
+                    zIndex: 500,
                     pointerEvents: 'none'
                 }}>
                     {activeEmote}
-                </div>
-            )}
-
-            {/* Emote Selector (Me only) */}
-            {isMe && isHovered && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: 'calc(100% - 5px)', // Tighter overlap
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    paddingBottom: '15px', // The 'bridge' to keep it open
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    zIndex: 410,
-                    animation: 'popIn 0.15s ease-out',
-                }}>
-                    <div style={{
-                        background: 'rgba(15, 23, 42, 0.95)',
-                        padding: '6px 10px',
-                        borderRadius: '20px',
-                        display: 'flex',
-                        gap: '8px',
-                        border: '1px solid rgba(255,255,255,0.2)',
-                        boxShadow: '0 8px 20px rgba(0,0,0,0.6)',
-                        backdropFilter: 'blur(10px)'
-                    }}>
-                        {EMOTES.map(emote => (
-                            <button
-                                key={emote}
-                                onClick={() => handleSendEmote(emote)}
-                                style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    fontSize: '1.2rem',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-                                    padding: '2px',
-                                    transform: 'scale(1)'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.target.style.transform = 'scale(1.4)';
-                                    e.target.style.filter = 'drop-shadow(0 0 6px rgba(255,255,255,0.4))';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.transform = 'scale(1)';
-                                    e.target.style.filter = 'none';
-                                }}
-                            >
-                                {emote}
-                            </button>
-                        ))}
-                    </div>
                 </div>
             )}
 
@@ -207,6 +180,70 @@ export default function PlayerBubble({
                 </div>
             )}
 
+            {/* Emote Selector (Me only) - Moved to end for DOM order stacking */}
+            {isMe && isHovered && (
+                <div
+                    onMouseEnter={() => { if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current); }}
+                    style={{
+                        position: 'absolute',
+                        [selectorSide === 'top' ? 'bottom' : 'top']: '100%',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        [selectorSide === 'top' ? 'paddingBottom' : 'paddingTop']: '25px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        zIndex: 1000, // Very high to stay above everything
+                        animation: selectorSide === 'top' ? 'popIn 0.15s ease-out' : 'popInBottom 0.15s ease-out',
+                        pointerEvents: 'auto'
+                    }}
+                >
+                    <div style={{
+                        background: 'rgba(15, 23, 42, 0.98)',
+                        padding: '6px 10px',
+                        borderRadius: '20px',
+                        display: 'flex',
+                        gap: '8px',
+                        border: '1px solid rgba(255,255,255,0.3)',
+                        boxShadow: '0 12px 24px rgba(0,0,0,0.8)',
+                        backdropFilter: 'blur(12px)'
+                    }}>
+                        {EMOTES.map(emote => (
+                            <button
+                                key={emote}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSendEmote(emote);
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    fontSize: '1.5rem',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                                    padding: '4px',
+                                    transform: 'scale(1)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    zIndex: 1001
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.5)';
+                                    e.currentTarget.style.filter = 'drop-shadow(0 0 8px rgba(255,255,255,0.6))';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.filter = 'none';
+                                }}
+                            >
+                                {emote}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <style>{`
                 @keyframes emotePop {
                     0% { transform: scale(0) translateY(20px); opacity: 0; }
@@ -218,10 +255,24 @@ export default function PlayerBubble({
                     50% { transform: translateY(-10px); }
                 }
                 @keyframes popIn {
-                    from { opacity: 0; transform: translateX(-50%) scale(0.8); }
-                    to { opacity: 1; transform: translateX(-50%) scale(1); }
+                    from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(20px); }
+                    to { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+                }
+                @keyframes popInBottom {
+                    from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(-20px); }
+                    to { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
                 }
             `}</style>
         </div>
     );
-}
+}, (prev, next) => {
+    // Custom comparison to stop irrelevant server-side property updates from breaking the hover state
+    return prev.player.id === next.player.id &&
+        prev.player.status === next.player.status &&
+        prev.isTurn === next.isTurn &&
+        prev.isMe === next.isMe &&
+        prev.stats === next.stats && // Note: stats must be useMemoized in parent
+        prev.tags === next.tags;     // Note: tags must be useMemoized in parent
+});
+
+export default PlayerBubble;

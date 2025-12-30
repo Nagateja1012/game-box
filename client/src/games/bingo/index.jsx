@@ -8,6 +8,56 @@ import GameOverOverlay from '../../design-system/GameOverOverlay';
 import PlayerBubble from '../../design-system/PlayerBubble';
 import TurnTimer from '../../design-system/TurnTimer';
 import TurnIndicator from '../../design-system/TurnIndicator';
+
+const BingoStat = React.memo(({ claimedLetters }) => (
+    <div className="bingo-letters-stat">
+        {['B', 'I', 'N', 'G', 'O'].map(l => (
+            <span key={l} className={`bingo-stat-letter ${claimedLetters.includes(l) ? 'acquired' : ''}`}>
+                {claimedLetters.includes(l) ? l : '•'}
+            </span>
+        ))}
+    </div>
+));
+
+const PlayerItem = React.memo(({ p, meId, roomId, turnIndex, players, turnStartTime, turnDuration }) => {
+    const isTurn = players[turnIndex]?.id === p.id;
+    const stats = useMemo(() => [{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters} /> }], [p.claimedLetters]);
+    const tags = useMemo(() => p.status === 'WAITING' ? ['OFFLINE'] : [], [p.status]);
+
+    return (
+        <TurnTimer isActive={isTurn} turnStartTime={turnStartTime} duration={turnDuration} variant="bingo" style={{ position: 'relative', width: 'auto', height: 'auto', overflow: 'visible' }}>
+            <PlayerBubble player={p} isMe={p.id === meId} roomId={roomId} isTurn={isTurn} variant="bingo" stats={stats} tags={tags} />
+        </TurnTimer>
+    );
+});
+
+const GameHeaderTimer = React.memo(({ status, setupEndTime, turnStartTime, turnDuration, turnPhase }) => {
+    const [timer, setTimer] = useState(0);
+
+    useEffect(() => {
+        let interval;
+        if (status === 'SETUP' && setupEndTime) {
+            interval = setInterval(() => {
+                const left = Math.max(0, Math.ceil((setupEndTime - Date.now()) / 1000));
+                setTimer(left);
+            }, 1000);
+        } else if (status === 'PLAYING') {
+            interval = setInterval(() => {
+                const now = Date.now();
+                const elapsed = now - turnStartTime;
+                const remaining = Math.max(0, Math.ceil((turnDuration - elapsed) / 1000));
+                setTimer(remaining);
+            }, 100);
+        }
+        return () => clearInterval(interval);
+    }, [status, setupEndTime, turnStartTime, turnDuration]);
+
+    return (
+        <div className="game-timer" style={{ fontSize: '2rem', fontWeight: '900', color: turnPhase === 'MARKING' ? '#ff5555' : '#FFD700', textShadow: '0 0 10px rgba(255,215,0,0.5)' }}>
+            {timer}s
+        </div>
+    );
+});
 import './bingo.css';
 
 // Helper to generate empty grid
@@ -19,15 +69,7 @@ export default function Bingo({ room, me }) {
     const [setupMode, setSetupMode] = useState('CHOICE');
     const [isRandomMode, setIsRandomMode] = useState(false);
     const [notification, setNotification] = useState(null);
-    const [timer, setTimer] = useState(0);
     const [pathVersion, setPathVersion] = useState(0);
-    const [isMuted, setIsMuted] = useState(() => {
-        try {
-            return localStorage.getItem('bingo_voice_muted') === 'true';
-        } catch {
-            return false;
-        }
-    });
 
     // Custom Fill state
     const [availableNumbers, setAvailableNumbers] = useState([]);
@@ -111,41 +153,19 @@ export default function Bingo({ room, me }) {
 
     // Voice Announcement Logic
     useEffect(() => {
-        if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !isMuted) {
+        if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !soundManager.muted) {
             const utterance = new SpeechSynthesisUtterance(gameState.lastCalledNumber.toString());
             utterance.rate = 1;
             utterance.pitch = 1;
             window.speechSynthesis.cancel(); // Cancel any ongoing speech
             window.speechSynthesis.speak(utterance);
         }
-    }, [gameState.lastCalledNumber, isMuted, gameState.status]);
+    }, [gameState.lastCalledNumber, gameState.status]);
 
-    const toggleMute = () => {
-        setIsMuted(prev => {
-            const newState = !prev;
-            localStorage.setItem('bingo_voice_muted', newState);
-            return newState;
-        });
-    };
 
-    // Timer Logic
-    useEffect(() => {
-        let interval;
-        if (gameState.status === 'SETUP' && gameState.setupEndTime) {
-            interval = setInterval(() => {
-                const left = Math.max(0, Math.ceil((gameState.setupEndTime - Date.now()) / 1000));
-                setTimer(left);
-            }, 1000);
-        } else if (gameState.status === 'PLAYING') {
-            interval = setInterval(() => {
-                const now = Date.now();
-                const elapsed = now - gameState.turnStartTime;
-                const remaining = Math.max(0, Math.ceil((gameState.turnDuration - elapsed) / 1000));
-                setTimer(remaining);
-            }, 100);
-        }
-        return () => clearInterval(interval);
-    }, [gameState.status, gameState.setupEndTime, gameState.turnStartTime, gameState.turnDuration]);
+
+    // Timer Logic moved to GameHeaderTimer for performance
+
 
 
     // Handlers
@@ -416,26 +436,9 @@ export default function Bingo({ room, me }) {
 
     const { sidePlayers, bottomPlayers } = renderPlayers();
 
-    const BingoStat = ({ claimedLetters }) => (
-        <div className="bingo-letters-stat">
-            {['B', 'I', 'N', 'G', 'O'].map(l => (
-                <span key={l} className={`bingo-stat-letter ${claimedLetters.includes(l) ? 'acquired' : ''}`}>
-                    {claimedLetters.includes(l) ? l : '•'}
-                </span>
-            ))}
-        </div>
-    );
 
-    const PlayerItem = ({ p }) => {
-        const isTurn = gameState.players[gameState.turnIndex]?.id === p.id;
-        return (
-            <TurnTimer isActive={isTurn} turnStartTime={gameState.turnStartTime} duration={gameState.turnDuration} variant="bingo" style={{ position: 'relative', width: 'auto', height: 'auto', overflow: 'visible' }}>
-                <PlayerBubble player={p} isMe={p.id === me.id} roomId={room.id} isTurn={isTurn} variant="bingo" stats={[{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters} /> }]} tags={p.status === 'WAITING' ? ['OFFLINE'] : []} />
-            </TurnTimer>
-        );
-    };
 
-    const SetupModal = () => (
+    const setupModalNode = (gameState.status === 'SETUP' && !alreadySetUp && setupMode === 'CHOICE') ? (
         <div className="setup-modal-overlay" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
             <div className="setup-modal-content" style={{ background: 'rgba(20, 30, 70, 0.95)', padding: '40px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', flexDirection: 'column', gap: '20px', textAlign: 'center', boxShadow: '0 0 50px rgba(0,0,0,0.5)', pointerEvents: 'auto' }} onClick={e => e.stopPropagation()}>
                 <h2>Start Your Game</h2>
@@ -446,7 +449,7 @@ export default function Bingo({ room, me }) {
                 </div>
             </div>
         </div>
-    );
+    ) : null;
 
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
@@ -485,18 +488,22 @@ export default function Bingo({ room, me }) {
                 <div className="bingo-layout">
                     <PopNotification show={!!notification} text={notification} color="#ff5555" />
                     <div className="left-panel">
-                        {sidePlayers.map(p => <PlayerItem key={p.id} p={p} />)}
+                        {sidePlayers.map(p => (
+                            <PlayerItem
+                                key={p.id}
+                                p={p}
+                                meId={me.id}
+                                roomId={room.id}
+                                turnIndex={gameState.turnIndex}
+                                players={gameState.players}
+                                turnStartTime={gameState.turnStartTime}
+                                turnDuration={gameState.turnDuration}
+                            />
+                        ))}
                     </div>
                     <div className="center-panel">
-                        {gameState.status === 'SETUP' && !alreadySetUp && setupMode === 'CHOICE' && <SetupModal />}
+                        {setupModalNode}
                         <div className="game-header" style={{ height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', position: 'relative' }}>
-                            <button
-                                className={`voice-mute-btn ${isMuted ? 'muted' : ''}`}
-                                onClick={toggleMute}
-                                title={isMuted ? "Unmute Voice" : "Mute Voice"}
-                            >
-                                {isMuted ? '🔇' : '🔊'}
-                            </button>
                             {gameState.status === 'PLAYING' && (
                                 <TurnIndicator
                                     isMyTurn={gameState.players[gameState.turnIndex]?.id === me.id}
@@ -505,7 +512,13 @@ export default function Bingo({ room, me }) {
                                 />
                             )}
                             <div className="phase-label" style={{ fontSize: '0.8rem', opacity: 0.8, letterSpacing: '1px' }}>{getPhaseMessage()}</div>
-                            <div className="game-timer" style={{ fontSize: '2rem', fontWeight: '900', color: gameState.turnPhase === 'MARKING' ? '#ff5555' : '#FFD700', textShadow: '0 0 10px rgba(255,215,0,0.5)' }}>{timer}s</div>
+                            <GameHeaderTimer
+                                status={gameState.status}
+                                setupEndTime={gameState.setupEndTime}
+                                turnStartTime={gameState.turnStartTime}
+                                turnDuration={gameState.turnDuration}
+                                turnPhase={gameState.turnPhase}
+                            />
                         </div>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', width: '100%', position: 'relative', paddingTop: '10px' }}>
                             {gameState.status === 'SETUP' && setupMode === 'CUSTOM' && (
@@ -524,7 +537,20 @@ export default function Bingo({ room, me }) {
                                 })}
                             </div>
                         </div>
-                        <div className="bottom-players">{bottomPlayers.map(p => <PlayerItem key={p.id} p={p} />)}</div>
+                        <div className="bottom-players">
+                            {bottomPlayers.map(p => (
+                                <PlayerItem
+                                    key={p.id}
+                                    p={p}
+                                    meId={me.id}
+                                    roomId={room.id}
+                                    turnIndex={gameState.turnIndex}
+                                    players={gameState.players}
+                                    turnStartTime={gameState.turnStartTime}
+                                    turnDuration={gameState.turnDuration}
+                                />
+                            ))}
+                        </div>
                     </div>
                     <div className="right-panel">
                         <div className="current-number-display" style={{ color: gameState.turnPhase === 'MARKING' ? '#FFD700' : 'white', borderColor: gameState.turnPhase === 'MARKING' ? '#FFD700' : 'white' }}>

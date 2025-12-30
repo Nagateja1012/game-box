@@ -14,7 +14,6 @@ export default function Uno({ room, me }) {
     const [showColorPicker, setShowColorPicker] = useState(false);
     const [pendingCard, setPendingCard] = useState(null);
     const [unoPopUp, setUnoPopUp] = useState(null);
-    const [muted, setMuted] = useState(true);
     const [showInvalidMove, setShowInvalidMove] = useState(false);
     const [skipPopUp, setSkipPopUp] = useState(null);
 
@@ -23,9 +22,7 @@ export default function Uno({ room, me }) {
     const prevTurnIndex = React.useRef(gameState.turnIndex);
     const prevGameStatus = React.useRef(gameState.gameStatus);
 
-    useEffect(() => {
-        soundManager.setMuted(muted);
-    }, [muted]);
+
 
     // Sound Effects Listeners
     useEffect(() => {
@@ -226,13 +223,7 @@ export default function Uno({ room, me }) {
             title="UNO"
             playScreen={
                 <div className="uno-game" style={{ height: '100%', width: '100%', overflow: 'hidden' }}>
-                    <button
-                        className="mute-btn"
-                        onClick={() => setMuted(!muted)}
-                        style={{ position: 'absolute', top: 20, right: 20, zIndex: 100, background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' }}
-                    >
-                        {muted ? '🔇' : '🔊'}
-                    </button>
+
 
                     <Table
                         players={gameState.players}

@@ -1,11 +1,12 @@
 class SoundManager {
     constructor() {
-        this.muted = false;
+        this.muted = localStorage.getItem('global_mute') === 'true';
         this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
 
     setMuted(muted) {
         this.muted = muted;
+        localStorage.setItem('global_mute', muted.toString());
         if (!muted && this.audioCtx.state === 'suspended') {
             this.audioCtx.resume();
         }
