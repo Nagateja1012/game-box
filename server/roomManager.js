@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
 
 const logger = require('./utils/logger');
+const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 
 const GAME_REGISTRY = {
     'UNO': UnoGame
@@ -21,8 +22,13 @@ class RoomManager extends EventEmitter {
         this.cleanupInterval = setInterval(() => this.checkRoomTimeouts(), 60000); // Every minute
     }
 
+    _sanitizeRoomId(roomId) {
+        return sanitize(roomId, { maxLength: 6, allowedType: VALIDATION_TYPES.ALPHANUMERIC }).toUpperCase();
+    }
+
     updateActivity(roomId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (room) {
             room.lastActivity = Date.now();
         }
@@ -30,9 +36,11 @@ class RoomManager extends EventEmitter {
 
     createRoom(hostId, hostName, userId) {
         const roomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const cleanHostName = sanitize(hostName, { maxLength: 20 });
+
         this.rooms.set(roomId, {
             id: roomId,
-            players: [{ id: hostId, name: hostName, isHost: true, userId, connected: true, status: 'WAITING' }],
+            players: [{ id: hostId, name: cleanHostName, isHost: true, userId, connected: true, status: 'WAITING' }],
             gameState: null,
             game: null, // The active game instance
             status: 'LOBBY', // LOBBY, PLAYING
@@ -44,7 +52,8 @@ class RoomManager extends EventEmitter {
     }
 
     joinRoom(roomId, playerId, playerName, userId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         // Check if player already in room (reconnect?)
@@ -85,8 +94,9 @@ class RoomManager extends EventEmitter {
                 return { error: `Room is full (max ${this.MAX_PLAYERS} players)` };
             }
             // Check if name is taken? (Optional, but good practice)
-            room.players.push({ id: playerId, name: playerName, isHost: false, userId, connected: true, status: 'WAITING' });
-            logger.info(`Player ${playerName} (${playerId}) joined room ${roomId}`);
+            const cleanPlayerName = sanitize(playerName, { maxLength: 10 });
+            room.players.push({ id: playerId, name: cleanPlayerName, isHost: false, userId, connected: true, status: 'WAITING' });
+            logger.info(`Player ${cleanPlayerName} (${playerId}) joined room ${roomId}`);
         }
 
         this.updateActivity(roomId);
@@ -94,7 +104,7 @@ class RoomManager extends EventEmitter {
     }
 
     getRoom(roomId) {
-        return this.rooms.get(roomId);
+        return this.rooms.get(this._sanitizeRoomId(roomId));
     }
 
 
@@ -110,7 +120,8 @@ class RoomManager extends EventEmitter {
     }
 
     startGame(roomId, gameId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const GameClass = GAME_REGISTRY[gameId];
@@ -142,7 +153,8 @@ class RoomManager extends EventEmitter {
     }
 
     stopGame(roomId, hostId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const player = room.players.find(p => p.id === hostId);
@@ -159,7 +171,8 @@ class RoomManager extends EventEmitter {
     }
 
     leaveGame(roomId, playerId, userId) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
         const player = room.players.find(p => p.id === playerId || (userId && p.userId === userId));
@@ -186,7 +199,8 @@ class RoomManager extends EventEmitter {
     }
 
     handleGameAction(roomId, playerId, action) {
-        const room = this.rooms.get(roomId);
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
         if (!room || !room.game) return { error: 'Game not active' };
 
         const player = room.players.find(p => p.id === playerId);

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoadingOverlay from '../design-system/LoadingOverlay';
+import SanitizedInput, { VALIDATION_TYPES } from '../design-system/SanitizedInput';
 
 export default function Home({ onJoin, onCreate, onSetName, playerName, isCreatingRoom }) {
     const [joinCode, setJoinCode] = useState('');
@@ -7,7 +8,7 @@ export default function Home({ onJoin, onCreate, onSetName, playerName, isCreati
     const [errorMsg, setErrorMsg] = useState('');
 
     // Check for room code in URL
-    useState(() => {
+    useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const roomParam = params.get('room');
         if (roomParam) {
@@ -43,23 +44,26 @@ export default function Home({ onJoin, onCreate, onSetName, playerName, isCreati
             <div className="card login-card">
                 <div className="input-group">
                     <label>YOUR NICKNAME</label>
-                    <input
+                    <SanitizedInput
                         type="text"
                         placeholder="Enter your name..."
                         value={playerName}
-                        onChange={(e) => onSetName(e.target.value)}
+                        onChange={(val) => onSetName(val)}
+                        maxLength={10}
+                        allowedType={VALIDATION_TYPES.ALPHANUMERIC}
                     />
                 </div>
 
                 <div className="actions">
                     <div className="input-group">
                         <label>ROOM CODE</label>
-                        <input
+                        <SanitizedInput
                             type="text"
                             placeholder="ABCD"
                             value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                            onChange={(val) => setJoinCode(val.toUpperCase())}
                             maxLength={6}
+                            allowedType={VALIDATION_TYPES.ALPHANUMERIC}
                             readOnly={isLocked}
                             style={{
                                 textAlign: 'center',
