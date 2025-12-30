@@ -5,7 +5,8 @@ const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 function init(io) {
     // Listen for async room updates from roomManager (e.g., timeout events)
     roomManager.on('room_updated', (roomId, room) => {
-        logger.info(`Async room update for room ${roomId}`);
+        // This is called for both manual turns and automatic timeouts
+        logger.info(`Broadcasting state update to room ${roomId}`);
         io.to(roomId).emit('room_updated', room);
     });
 
@@ -98,6 +99,9 @@ function setupSocketHandlers(io, socket) {
             const cleanRoomId = sanitize(roomId, { maxLength: 6, allowedType: VALIDATION_TYPES.ALPHANUMERIC }).toUpperCase();
             const cleanEmote = sanitize(emote, { maxLength: 10 });
             io.to(cleanRoomId).emit('player_emote', { playerId: socket.id, emote: cleanEmote });
+
+            // Emotes count as manual activity to keep room alive
+            roomManager.updateActivity(cleanRoomId);
         } catch (error) {
             logger.error(`Error in send_emote`, error);
         }

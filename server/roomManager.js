@@ -41,6 +41,7 @@ class RoomManager extends EventEmitter {
         const room = this.rooms.get(cleanRoomId);
         if (room) {
             room.lastActivity = Date.now();
+            logger.info(`Manual activity detected in room ${cleanRoomId}. Reseting inactivity timer.`);
         }
     }
 
