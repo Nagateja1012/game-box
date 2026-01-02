@@ -2,6 +2,7 @@ import React from 'react';
 import { socket } from '../socket';
 import { GAME_METADATA } from '../games/registry';
 import SanitizedInput, { VALIDATION_TYPES } from '../design-system/SanitizedInput';
+import PlayerAvatar from '../design-system/PlayerAvatar';
 
 export default function Lobby({ room, me }) {
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -68,12 +69,12 @@ export default function Lobby({ room, me }) {
                     <h3>PLAYERS</h3>
                     <ul>
                         {room.players.map(p => (
-                            <li key={p.id} className={p.id === me.id ? 'me' : ''}>
-                                <span className="avatar">{p.name[0].toUpperCase()}</span>
+                            <li key={p.id} className={p.id === me.id ? 'me' : ''} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px' }}>
+                                <PlayerAvatar name={p.name} size="md" />
                                 <div className="player-info">
-                                    <span className="name">{p.name} {p.isHost && '👑'}</span>
-                                    <span className="status" style={{ fontSize: '0.7rem', opacity: 0.7, marginLeft: '5px' }}>
-                                        ({p.status || 'WAITING'})
+                                    <span className="name" style={{ fontWeight: 'bold' }}>{p.name} {p.isHost && '👑'}</span>
+                                    <span className="status" style={{ fontSize: '0.7rem', opacity: 0.7, display: 'block' }}>
+                                        {p.status || 'WAITING'}
                                     </span>
                                 </div>
                             </li>

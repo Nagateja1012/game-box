@@ -34,6 +34,7 @@ class UnoGame {
             isUno: false,
             hasDrawn: false
         }));
+
         this.createDeck();
         this.shuffleDeck();
         this.dealCards();
@@ -484,13 +485,14 @@ class UnoGame {
             }
         }
 
-        // Check win condition (if only 1 player left)
+        // Check win condition (if only 1 player or 0 left)
         if (this.players.length < 2) {
-            this.winner = this.players[0];
+            this.winner = this.players[0] || null;
             this.gameStatus = 'ENDED';
             this.clearTurnTimer();
-            this.calculateScores();
-            logger.info(`Game ended due to player exit. Winner: ${this.winner?.name}`);
+            if (this.winner) this.calculateScores();
+            logger.info(`Game ended due to player exit. Winner: ${this.winner ? this.winner.name : 'None'}`);
+            this.emitStateChange();
             return true; // Game Ended
         }
 
@@ -498,6 +500,10 @@ class UnoGame {
         this.startTurnTimer();
 
         return false; // Game continues
+    }
+
+    emitStateChange() {
+        if (this.onStateChange) this.onStateChange();
     }
 
     stop() {

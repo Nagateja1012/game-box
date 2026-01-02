@@ -1,18 +1,41 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import PlayerAvatar from './PlayerAvatar';
+import Button from './Button';
+import { soundManager } from '../utils/soundManager';
 
 export default function GameOverOverlay({
     winner,
     players = [],
     scores = {}, // { playerId: value }
-    actions,
-    title = "WINNER!"
+    onRestart,
+    onClose,
+    onLeave,
+    isHost = false,
+    title = "WINNER!",
+    scoreLabel = "SCORE",
+    sortOrder = 'asc' // 'asc' for Uno, 'desc' for Bingo
 }) {
-    // Sort players by score (ascending usually for card games where points are bad, or descending for others)
-    // For now, let's just use the players array provided or derive from scores
+    // Sort players by score
     const sortedPlayers = [...players]
-        .map(p => ({ ...p, score: scores[p.id] || 0 }))
-        .sort((a, b) => a.score - b.score);
+        .map(p => {
+            const score = scores[p.id];
+            // Handle complex score objects (e.g. Bingo) or simple numbers
+            const rawScore = (score && typeof score === 'object') ? score.primary : (score || 0);
+            const displayScore = (score && typeof score === 'object') ? score.display : (score || 0);
+            return { ...p, rawScore, displayScore };
+        })
+        .sort((a, b) => {
+            if (sortOrder === 'asc') {
+                return a.rawScore - b.rawScore;
+            } else {
+                return b.rawScore - a.rawScore;
+            }
+        });
+
+    // Play hover sound helper
+    const handleHover = () => {
+        soundManager.playHover();
+    };
 
     return (
         <div className="modal-overlay game-over-overlay" style={{
@@ -45,9 +68,15 @@ export default function GameOverOverlay({
                 }}>{title}</h1>
 
                 {winner && (
-                    <div className="winner-section" style={{ marginBottom: '40px' }}>
-                        <PlayerAvatar name={winner.name} size="lg" style={{ margin: '0 auto 15px' }} />
-                        <h2 style={{ fontSize: '2rem' }}>{winner.name}</h2>
+                    <div className="winner-section" style={{
+                        marginBottom: '40px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '20px'
+                    }}>
+                        <PlayerAvatar name={winner.name} size="lg" />
+                        <h2 style={{ fontSize: '2rem', margin: 0 }}>{winner.name}</h2>
                     </div>
                 )}
 
@@ -57,9 +86,11 @@ export default function GameOverOverlay({
                         background: 'rgba(255,255,255,0.05)',
                         padding: '20px',
                         borderRadius: '20px',
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        maxHeight: '30vh',
+                        overflowY: 'auto'
                     }}>
-                        <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>SCORES</h3>
+                        <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>{scoreLabel}</h3>
                         {sortedPlayers.map((p, i) => (
                             <div key={p.id} style={{
                                 display: 'flex',
@@ -74,7 +105,7 @@ export default function GameOverOverlay({
                                     <span style={{ opacity: 0.5 }}>#{i + 1}</span>
                                     <span>{p.name}</span>
                                 </div>
-                                <span>{p.score}</span>
+                                <span>{p.displayScore}</span>
                             </div>
                         ))}
                     </div>
@@ -83,11 +114,56 @@ export default function GameOverOverlay({
                 <div className="actions" style={{
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: '10px',
+                    gap: '12px',
                     marginTop: '30px',
                     alignItems: 'center'
                 }}>
-                    {actions}
+                    {isHost && onRestart && (
+                        <Button
+                            variant="primary"
+                            style={{ width: '240px', padding: '12px', fontSize: '1.1rem' }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onRestart();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            PLAY AGAIN
+                        </Button>
+                    )}
+
+                    {isHost && onClose && (
+                        <Button
+                            variant="primary"
+                            style={{
+                                width: '240px',
+                                border: '2px solid #ff5555',
+                                background: 'rgba(255, 85, 85, 0.15)',
+                                color: '#ff5555'
+                            }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onClose();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            CLOSE GAME
+                        </Button>
+                    )}
+
+                    {onLeave && (
+                        <Button
+                            variant="secondary"
+                            style={{ width: '240px' }}
+                            onClick={() => {
+                                soundManager.playClick();
+                                onLeave();
+                            }}
+                            onMouseEnter={handleHover}
+                        >
+                            BACK TO LOBBY
+                        </Button>
+                    )}
                 </div>
             </div>
         </div>

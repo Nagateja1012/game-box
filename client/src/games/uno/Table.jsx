@@ -1,7 +1,57 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import Card from './Card';
 import PlayerBubble from '../../design-system/PlayerBubble';
 import TurnTimer from '../../design-system/TurnTimer';
+import TurnIndicator from '../../design-system/TurnIndicator';
+
+const OpponentItem = React.memo(({ player, index, total, turnIndex, players, turnStartTime, roomId }) => {
+    // Arc calculation logic
+    const centerAngle = 270;
+    const maxArc = 280;
+    const arcWidth = Math.min(maxArc, (total - 1) * 45 + 60);
+    const startAngle = centerAngle - arcWidth / 2;
+    const angleStep = total > 1 ? arcWidth / (total - 1) : 0;
+    const angle = startAngle + index * angleStep;
+    const rad = (angle * Math.PI) / 180;
+    const xRadius = Math.min(window.innerWidth * 0.38, 480);
+    const yRadius = Math.min(window.innerHeight * 0.26, 220);
+    const x = Math.cos(rad) * xRadius;
+    const y = Math.sin(rad) * yRadius;
+
+    const style = {
+        position: 'absolute',
+        left: '50%',
+        top: '50%',
+        transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`,
+        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 100,
+        pointerEvents: 'auto'
+    };
+
+    const isTurn = players[turnIndex]?.id === player.id;
+    const stats = useMemo(() => [{ icon: '🎴', value: player.cardCount }], [player.cardCount]);
+    const tags = useMemo(() => player.isUno ? ['UNO!'] : [], [player.isUno]);
+
+    return (
+        <TurnTimer isActive={isTurn} turnStartTime={turnStartTime} variant="cards" style={style}>
+            <PlayerBubble player={player} isMe={false} roomId={roomId} isTurn={isTurn} variant="cards" stats={stats} tags={tags} />
+        </TurnTimer>
+    );
+});
+
+const MeBubble = React.memo(({ me, players, turnIndex, turnStartTime, roomId }) => {
+    const myPlayer = players.find(p => p.id === me.id);
+    if (!myPlayer) return null;
+    const isMyTurn = players[turnIndex]?.id === me.id;
+    const stats = useMemo(() => [{ icon: '🎴', value: myPlayer.cardCount }], [myPlayer.cardCount]);
+    const tags = useMemo(() => myPlayer.isUno ? ['UNO!'] : [], [myPlayer.isUno]);
+
+    return (
+        <TurnTimer isActive={isMyTurn} turnStartTime={turnStartTime} variant="cards">
+            <PlayerBubble player={myPlayer} isMe={true} roomId={roomId} isTurn={isMyTurn} variant="cards" stats={stats} tags={tags} />
+        </TurnTimer>
+    );
+});
 
 export default function Table({
     players,
@@ -54,60 +104,18 @@ export default function Table({
     return (
         <div className="uno-table" style={{ width: '100%', height: '100%', position: 'relative' }}>
             <div className="opponents-ring" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
-                {orderedOpponents.map((player, index) => {
-                    const total = orderedOpponents.length;
-
-                    // Opponents start from the top (270deg) and spread outwards
-                    // We avoid the bottom area (near 90deg) where 'me' is located
-                    const centerAngle = 270;
-
-                    // Arc width increases with player count, but capped to leave space at the bottom
-                    const maxArc = 280;
-                    const arcWidth = Math.min(maxArc, (total - 1) * 45 + 60);
-
-                    const startAngle = centerAngle - arcWidth / 2;
-                    const angleStep = total > 1 ? arcWidth / (total - 1) : 0;
-                    const angle = startAngle + index * angleStep;
-
-                    // Radian conversion
-                    const rad = (angle * Math.PI) / 180;
-
-                    const xRadius = Math.min(window.innerWidth * 0.38, 480);
-                    const yRadius = Math.min(window.innerHeight * 0.26, 220);
-
-                    const x = Math.cos(rad) * xRadius;
-                    const y = Math.sin(rad) * yRadius;
-
-                    const style = {
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        transform: `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`,
-                        transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                        zIndex: 100,
-                        pointerEvents: 'auto'
-                    };
-
-                    const isTurn = players[turnIndex]?.id === player.id;
-
-                    return (
-                        <TurnTimer
-                            key={player.id}
-                            isActive={isTurn}
-                            turnStartTime={turnStartTime}
-                            style={style}
-                        >
-                            <PlayerBubble
-                                player={player}
-                                isMe={false}
-                                roomId={roomId}
-                                isTurn={isTurn}
-                                stats={[{ icon: '🎴', value: player.cardCount }]}
-                                tags={player.isUno ? ['UNO!'] : []}
-                            />
-                        </TurnTimer>
-                    );
-                })}
+                {orderedOpponents.map((player, index) => (
+                    <OpponentItem
+                        key={player.id}
+                        player={player}
+                        index={index}
+                        total={orderedOpponents.length}
+                        turnIndex={turnIndex}
+                        players={players}
+                        turnStartTime={turnStartTime}
+                        roomId={roomId}
+                    />
+                ))}
 
                 {/* Always show "me" at the bottom center */}
                 {me && (
@@ -119,27 +127,13 @@ export default function Table({
                         zIndex: 150,
                         pointerEvents: 'auto'
                     }}>
-                        {(() => {
-                            const myPlayer = players.find(p => p.id === me.id);
-                            if (!myPlayer) return null;
-                            const isMyTurn = players[turnIndex]?.id === me.id;
-
-                            return (
-                                <TurnTimer
-                                    isActive={isMyTurn}
-                                    turnStartTime={turnStartTime}
-                                >
-                                    <PlayerBubble
-                                        player={myPlayer}
-                                        isMe={true}
-                                        roomId={roomId}
-                                        isTurn={isMyTurn}
-                                        stats={[{ icon: '🎴', value: myPlayer.cardCount }]}
-                                        tags={myPlayer.isUno ? ['UNO!'] : []}
-                                    />
-                                </TurnTimer>
-                            );
-                        })()}
+                        <MeBubble
+                            me={me}
+                            players={players}
+                            turnIndex={turnIndex}
+                            turnStartTime={turnStartTime}
+                            roomId={roomId}
+                        />
                     </div>
                 )}
             </div>
@@ -155,20 +149,18 @@ export default function Table({
                 zIndex: 5
             }}>
                 {showTurnIndicator && (
-                    <div className="turn-indicator-modern" style={{
-                        background: players[turnIndex]?.id === me.id ? 'var(--accent-turn)' : 'rgba(0, 0, 0, 0.8)',
+                    <div style={{
                         position: 'absolute',
                         top: '-50px',
-                        padding: '8px 25px',
-                        borderRadius: '50px',
-                        whiteSpace: 'nowrap',
-                        fontWeight: '800',
-                        fontSize: '1rem',
-                        border: players[turnIndex]?.id === me.id ? '2px solid white' : '1px solid rgba(255,255,255,0.3)',
-                        boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-                        animation: 'popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 10
                     }}>
-                        {players[turnIndex]?.id === me.id ? 'YOUR TURN' : `${players[turnIndex]?.name.toUpperCase()}'S TURN`}
+                        <TurnIndicator
+                            isMyTurn={players[turnIndex]?.id === me.id}
+                            playerName={players[turnIndex]?.name}
+                            variant="cards"
+                        />
                     </div>
                 )}
 

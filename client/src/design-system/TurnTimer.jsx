@@ -18,6 +18,7 @@ export default function TurnTimer({
     criticalThreshold = 5000,
     onTimeout = () => { },
     style = {},
+    variant = 'cards',
     children
 }) {
     const [timeRemaining, setTimeRemaining] = useState(totalDuration);
@@ -72,11 +73,11 @@ export default function TurnTimer({
         <div style={{
             position: 'relative',
             display: 'inline-block',
-            borderRadius: '12px',
+            borderRadius: variant === 'bingo' ? '30px' : '12px',
             transition: 'all 0.3s ease',
             ...style
         }}>
-            {/* Background highlight/glow */}
+            {/* Background highlight/glow - Removed zIndex to avoid new stacking context */}
             {isActive && (
                 <div style={{
                     position: 'absolute',
@@ -84,16 +85,15 @@ export default function TurnTimer({
                     left: '-6px',
                     right: '-6px',
                     bottom: '-6px',
-                    borderRadius: '16px',
+                    borderRadius: variant === 'bingo' ? '35px' : '16px',
                     border: `3px solid ${ringColor}`,
                     boxShadow: `0 0 15px ${ringColor}, inset 0 0 10px ${ringColor}`,
-                    zIndex: 0,
                     animation: 'pulse-glow 1.5s infinite alternate',
                     pointerEvents: 'none'
                 }} />
             )}
 
-            <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ position: 'relative' }}>
                 {children}
             </div>
 

@@ -1,12 +1,22 @@
 const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
+const BingoGame = require('./games/bingo/logic');
 
 const logger = require('./utils/logger');
 const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 
 const GAME_REGISTRY = {
-    'UNO': UnoGame
+    'UNO': UnoGame,
+    'BINGO': BingoGame
 };
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
 
 class RoomManager extends EventEmitter {
     constructor() {
@@ -31,6 +41,7 @@ class RoomManager extends EventEmitter {
         const room = this.rooms.get(cleanRoomId);
         if (room) {
             room.lastActivity = Date.now();
+            logger.info(`Manual activity detected in room ${cleanRoomId}. Reseting inactivity timer.`);
         }
     }
 
@@ -128,6 +139,9 @@ class RoomManager extends EventEmitter {
         if (!GameClass) return { error: `${gameId} not found` };
 
         try {
+            // Shuffle players for universal random turn order and display
+            shuffleArray(room.players);
+
             room.game = new GameClass();
             if (room.game.init) {
                 room.game.init(room.players);
@@ -195,6 +209,7 @@ class RoomManager extends EventEmitter {
             }
         }
 
+        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -279,6 +294,7 @@ class RoomManager extends EventEmitter {
                     room.players[0].isHost = true;
                     logger.info(`Host migrated to ${room.players[0].name} in room ${roomId}`);
                 }
+                this.updateActivity(roomId);
                 return { roomId, room: this.getSerializableRoom(room) };
             }
         }
