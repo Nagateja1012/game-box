@@ -2,15 +2,18 @@ import React, { useEffect } from 'react';
 import PlayerAvatar from './PlayerAvatar';
 import Button from './Button';
 import { soundManager } from '../utils/soundManager';
+import { socket } from '../socket';
 
 export default function GameOverOverlay({
     winner,
     players = [],
     scores = {}, // { playerId: value }
     onRestart,
+    onVote,
     onClose,
     onLeave,
     isHost = false,
+    meUserId,
     title = "WINNER!",
     scoreLabel = "SCORE",
     sortOrder = 'asc' // 'asc' for Uno, 'desc' for Bingo
@@ -18,7 +21,7 @@ export default function GameOverOverlay({
     // Sort players by score
     const sortedPlayers = [...players]
         .map(p => {
-            const score = scores[p.id];
+            const score = scores[p.userId];
             // Handle complex score objects (e.g. Bingo) or simple numbers
             const rawScore = (score && typeof score === 'object') ? score.primary : (score || 0);
             const displayScore = (score && typeof score === 'object') ? score.display : (score || 0);
@@ -106,6 +109,13 @@ export default function GameOverOverlay({
                                     <span>{p.name}</span>
                                 </div>
                                 <span>{p.displayScore}</span>
+                                {p.wantsRematch && (
+                                    <span style={{ marginLeft: '10px', color: '#4ade80' }} title="Voted to Play Again">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                        </svg>
+                                    </span>
+                                )}
                             </div>
                         ))}
                     </div>
@@ -118,17 +128,23 @@ export default function GameOverOverlay({
                     marginTop: '30px',
                     alignItems: 'center'
                 }}>
-                    {isHost && onRestart && (
+                    {onVote && (
                         <Button
                             variant="primary"
-                            style={{ width: '240px', padding: '12px', fontSize: '1.1rem' }}
+                            disabled={players.find(p => p.userId === meUserId)?.wantsRematch}
+                            style={{
+                                width: '240px',
+                                padding: '12px',
+                                fontSize: '1.1rem',
+                                background: players.find(p => p.userId === meUserId)?.wantsRematch ? '#4ade80' : 'var(--primary-color)'
+                            }}
                             onClick={() => {
                                 soundManager.playClick();
-                                onRestart();
+                                onVote();
                             }}
                             onMouseEnter={handleHover}
                         >
-                            PLAY AGAIN
+                            {players.find(p => p.userId === meUserId)?.wantsRematch ? 'WAITING FOR OTHERS...' : 'PLAY AGAIN'}
                         </Button>
                     )}
 

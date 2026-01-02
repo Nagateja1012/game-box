@@ -25,11 +25,12 @@ class RoomManager extends EventEmitter {
         this.disconnectionTimers = new Map(); // userId -> timeoutId
         this.DISCONNECT_TIMEOUT = 30000; // 30 seconds
         this.MAX_PLAYERS = 12;
-        this.IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+        this.MAX_PLAYERS = 12;
+        this.PLAYER_HEARTBEAT_TIMEOUT = 45000; // 45 seconds
         this.MAX_ROOM_DURATION = 120 * 60 * 1000; // 120 minutes
 
         // Start background cleanup
-        this.cleanupInterval = setInterval(() => this.checkRoomTimeouts(), 60000); // Every minute
+        this.cleanupInterval = setInterval(() => this.checkRoomTimeouts(), 10000); // Every 10 seconds
     }
 
     _sanitizeRoomId(roomId) {
@@ -37,11 +38,32 @@ class RoomManager extends EventEmitter {
     }
 
     updateActivity(roomId) {
+        // Kept for compatibility, but room closure is now purely based on player presence/heartbeats
+        // We could use this to track "game" activity if needed later.
         const cleanRoomId = this._sanitizeRoomId(roomId);
         const room = this.rooms.get(cleanRoomId);
         if (room) {
             room.lastActivity = Date.now();
-            logger.info(`Manual activity detected in room ${cleanRoomId}. Reseting inactivity timer.`);
+        }
+    }
+
+    updateHeartbeat(socketId, userId) {
+        // Find player in any room
+        for (const [roomId, room] of this.rooms.entries()) {
+            const player = room.players.find(p => p.id === socketId || (userId && p.userId === userId));
+            if (player) {
+                player.lastHeartbeat = Date.now();
+                if (!player.connected) {
+                    player.connected = true;
+                    // Clear disconnection timer if it exists (implicit reconnect)
+                    if (player.userId && this.disconnectionTimers.has(player.userId)) {
+                        clearTimeout(this.disconnectionTimers.get(player.userId));
+                        this.disconnectionTimers.delete(player.userId);
+                        logger.info(`Disconnection timer cleared for ${player.name} (${player.userId}) via heartbeat`);
+                    }
+                }
+                return;
+            }
         }
     }
 
@@ -51,12 +73,24 @@ class RoomManager extends EventEmitter {
 
         this.rooms.set(roomId, {
             id: roomId,
-            players: [{ id: hostId, name: cleanHostName, isHost: true, userId, connected: true, status: 'WAITING' }],
+            players: [{
+                id: hostId,
+                name: cleanHostName,
+                isHost: true,
+                userId,
+                connected: true,
+                status: 'WAITING',
+                lastHeartbeat: Date.now()
+            }],
             gameState: null,
             game: null, // The active game instance
             status: 'LOBBY', // LOBBY, PLAYING
             createdAt: Date.now(),
-            lastActivity: Date.now()
+            status: 'LOBBY', // LOBBY, PLAYING
+            createdAt: Date.now(),
+            lastActivity: Date.now(),
+            processedNonces: new Map(), // nonce -> timestamp
+            isProcessingAction: false
         });
         logger.info(`Room created: ${roomId} by ${hostName} (${hostId})`);
         return roomId;
@@ -76,6 +110,11 @@ class RoomManager extends EventEmitter {
             existingPlayer.id = playerId; // Update socket ID
             existingPlayer.connected = true;
             logger.info(`Player ${playerName} (${userId}) reconnected to room ${roomId} with new socket ${playerId}`);
+
+            // Sync to game logic
+            if (room.game && room.game.updatePlayerStatus) {
+                room.game.updatePlayerStatus(userId, { connected: true, id: playerId });
+            }
 
             // Clear disconnection timer if it exists
             if (this.disconnectionTimers.has(userId)) {
@@ -106,7 +145,15 @@ class RoomManager extends EventEmitter {
             }
             // Check if name is taken? (Optional, but good practice)
             const cleanPlayerName = sanitize(playerName, { maxLength: 10 });
-            room.players.push({ id: playerId, name: cleanPlayerName, isHost: false, userId, connected: true, status: 'WAITING' });
+            room.players.push({
+                id: playerId,
+                name: cleanPlayerName,
+                isHost: false,
+                userId,
+                connected: true,
+                status: 'WAITING',
+                lastHeartbeat: Date.now()
+            });
             logger.info(`Player ${cleanPlayerName} (${playerId}) joined room ${roomId}`);
         }
 
@@ -221,7 +268,23 @@ class RoomManager extends EventEmitter {
         const player = room.players.find(p => p.id === playerId);
         if (!player) return { error: 'Player not found' };
 
+        if (room.isProcessingAction) {
+            return { error: 'Game is busy', noChange: true };
+        }
+
         try {
+            room.isProcessingAction = true;
+
+            // Idempotency Check
+            if (action.nonce) {
+                if (room.processedNonces.has(action.nonce)) {
+                    logger.info(`Duplicate action detected (nonce: ${action.nonce}) from ${playerId}. Ignoring.`);
+                    return { noChange: true };
+                }
+                // Store nonce with timestamp
+                room.processedNonces.set(action.nonce, Date.now());
+            }
+
             const changed = room.game.handleAction(action, player);
             if (changed) {
                 room.gameState = room.game.getState();
@@ -231,6 +294,8 @@ class RoomManager extends EventEmitter {
         } catch (error) {
             logger.error(`Error handling game action in room ${roomId}`, error);
             return { error: 'Game action failed' };
+        } finally {
+            room.isProcessingAction = false;
         }
         return { noChange: true };
     }
@@ -241,6 +306,11 @@ class RoomManager extends EventEmitter {
             if (player) {
                 player.connected = false;
                 logger.info(`Player ${player.name} (${socketId}) disconnected from room ${roomId} (marked offline)`);
+
+                // Sync to game logic
+                if (room.game && room.game.updatePlayerStatus) {
+                    room.game.updatePlayerStatus(player.userId, { connected: false });
+                }
 
                 const userId = player.userId;
                 if (userId) {
@@ -277,6 +347,11 @@ class RoomManager extends EventEmitter {
                 const wasHost = player.isHost;
                 const actualSocketId = player.id;
 
+                // Sync to game logic if removing
+                if (room.game && room.game.updatePlayerStatus) {
+                    room.game.updatePlayerStatus(userId, { connected: false });
+                }
+
                 room.players.splice(playerIndex, 1);
                 logger.info(`Player ${player.name} (${actualSocketId}) removed from room ${roomId}`);
 
@@ -303,16 +378,50 @@ class RoomManager extends EventEmitter {
 
     checkRoomTimeouts() {
         const now = Date.now();
+
+        // 1. Check for player timeouts
         for (const [roomId, room] of this.rooms.entries()) {
-            const isIdle = now - room.lastActivity > this.IDLE_TIMEOUT;
+            // Iterate backwards so we can safely remove if needed (though we use handleDisconnect which doesn't remove immediately)
+            // Actually handleDisconnect just marks connected=false and starts timer.
+            // We want to detect if heartbeat is OLD.
+
+            [...room.players].forEach(player => {
+                if (player.connected && (now - player.lastHeartbeat > this.PLAYER_HEARTBEAT_TIMEOUT)) {
+                    logger.info(`Player ${player.name} missed heartbeats (last: ${now - player.lastHeartbeat}ms ago). Marking offline.`);
+                    this.handleDisconnect(player.id);
+                }
+
+            });
+
+            // Cleanup old nonces (keep for 5 minutes)
+            if (room.processedNonces) {
+                for (const [nonce, timestamp] of room.processedNonces.entries()) {
+                    if (now - timestamp > 5 * 60 * 1000) {
+                        room.processedNonces.delete(nonce);
+                    }
+                }
+            }
+        }
+
+        // 2. Check for empty/expired rooms
+        for (const [roomId, room] of this.rooms.entries()) {
+            // Room is empty if 0 players matching
+            // We can also consider "all players undefined/disconnected" but removePlayer removes them from array.
+            // So empty array = empty room.
+
+            const isEmpty = room.players.length === 0;
             const isExpired = now - room.createdAt > this.MAX_ROOM_DURATION;
 
-            if (isIdle || isExpired) {
-                const reason = isIdle ? 'IDLE' : 'EXPIRED';
-                logger.info(`Closing room ${roomId} due to ${reason}`);
-
-                // Emit event for socketHandlers to broadcast
-                this.emit('room_closed', roomId, { reason });
+            if (isEmpty || isExpired) {
+                const reason = isEmpty ? 'EMPTY' : 'EXPIRED';
+                if (isExpired) {
+                    logger.info(`Closing room ${roomId} due to ${reason}`);
+                    // Emit event for socketHandlers to broadcast
+                    this.emit('room_closed', roomId, { reason });
+                } else {
+                    // Silent cleanup for empty rooms
+                    // logger.info(`Cleaning up empty room ${roomId}`);
+                }
 
                 // Explicitly stop any active game (clears timers)
                 if (room.game && room.game.stop) {

@@ -28,11 +28,14 @@ class UnoGame {
     // Initialize game with players
     init(players) {
         this.players = players.map(p => ({
-            id: p.id,
+            id: p.id, // Current socket ID
+            userId: p.userId,
             name: p.name,
             hand: [],
             isUno: false,
-            hasDrawn: false
+            hasDrawn: false,
+            wantsRematch: false,
+            connected: true
         }));
 
         this.createDeck();
@@ -116,16 +119,21 @@ class UnoGame {
     }
 
     handleAction(action, player) {
-        if (this.gameStatus !== 'PLAYING' && action.type !== 'RESTART_GAME') return false;
+        if (this.gameStatus !== 'PLAYING' && action.type !== 'RESTART_GAME' && action.type !== 'VOTE_PLAY_AGAIN') return false;
 
-        const playerIndex = this.players.findIndex(p => p.id === player.id);
+        const playerIndex = this.players.findIndex(p => p.userId === player.userId);
         if (playerIndex === -1) {
-            logger.warn(`Player ${player.name} not found in game players list`);
+            logger.warn(`Player ${player.name} (ID: ${player.userId}) not found in game players list`);
             return false;
         }
 
-        // Check if it's player's turn (except for Uno shout or Restart)
-        if (playerIndex !== this.turnIndex && action.type !== 'UNO_SHOUT' && action.type !== 'RESTART_GAME') {
+        const gamePlayer = this.players[playerIndex];
+
+        // Check if it's player's turn (except for Uno shout, Restart, or Voting)
+        if (playerIndex !== this.turnIndex &&
+            action.type !== 'UNO_SHOUT' &&
+            action.type !== 'RESTART_GAME' &&
+            action.type !== 'VOTE_PLAY_AGAIN') {
             // logger.warn(`Player ${player.name} attempted action out of turn`);
             return false;
         }
@@ -136,10 +144,10 @@ class UnoGame {
             case 'DRAW_CARD':
                 return this.playerDrawCard(playerIndex);
             case 'UNO_SHOUT':
-                this.players[playerIndex].isUno = true;
+                gamePlayer.isUno = true;
                 this.lastUnoShout = {
-                    playerId: player.id,
-                    name: player.name,
+                    playerId: gamePlayer.userId,
+                    name: gamePlayer.name,
                     time: Date.now()
                 };
                 logger.info(`UNO Shout by ${player.name}`);
@@ -148,6 +156,16 @@ class UnoGame {
                 return this.passTurn(playerIndex);
             case 'RESTART_GAME':
                 return this.restartGame(playerIndex);
+            case 'VOTE_PLAY_AGAIN':
+                gamePlayer.wantsRematch = true;
+                logger.info(`Player ${gamePlayer.name} voted to play again`);
+                // Check if all CONNECTED players want rematch
+                const activePlayers = this.players.filter(p => p.connected);
+                if (activePlayers.every(p => p.wantsRematch)) {
+                    logger.info('All connected players voted for rematch. Restarting game.');
+                    this.restartGame(playerIndex, true); // true = force because voting
+                }
+                return true;
             default:
                 logger.warn(`Unknown action type: ${action.type}`);
                 return false;
@@ -375,7 +393,7 @@ class UnoGame {
                 else if (['SKIP', 'REVERSE', 'DRAW_TWO'].includes(c.value)) score += 20;
                 else if (['WILD', 'WILD_DRAW_FOUR'].includes(c.value)) score += 50;
             });
-            this.scores[p.id] = score;
+            this.scores[p.userId] = score;
         });
     }
 
@@ -402,6 +420,23 @@ class UnoGame {
         return nextIndex;
     }
 
+    updatePlayerStatus(userId, status) {
+        const player = this.players.find(p => p.userId === userId);
+        if (player) {
+            player.connected = status.connected;
+            if (status.id) player.id = status.id; // Update socket ID on reconnect
+            logger.info(`Sync: Player ${player.name} connected=${player.connected}`);
+
+            // If everyone is now ready to rematch because someone disconnected...
+            if (this.gameStatus === 'ENDED') {
+                const activePlayers = this.players.filter(p => p.connected);
+                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
+                    this.restartGame(0, true);
+                }
+            }
+        }
+    }
+
     advanceTurn(skip = false) {
         if (skip) {
             const skippedPlayer = this.players[this.getNextPlayerIndex()];
@@ -423,17 +458,24 @@ class UnoGame {
             gameStatus: this.gameStatus,
             players: this.players.map(p => ({
                 id: p.id,
+                userId: p.userId,
                 name: p.name,
                 cardCount: p.hand.length,
                 isUno: p.isUno,
                 hasDrawn: p.hasDrawn,
-                isTurn: this.players[this.turnIndex].id === p.id
+                wantsRematch: p.wantsRematch,
+                connected: p.connected,
+                isTurn: this.players[this.turnIndex] ? this.players[this.turnIndex].userId === p.userId : false
             })),
             topCard: this.discardPile[this.discardPile.length - 1],
             currentColor: this.currentColor,
             direction: this.direction,
             turnIndex: this.turnIndex,
-            winner: this.winner,
+            winner: this.winner ? {
+                id: this.winner.id,
+                userId: this.winner.userId,
+                name: this.winner.name
+            } : null,
             scores: this.scores,
             lastUnoShout: this.lastUnoShout,
             drawStack: this.drawStack,
@@ -496,8 +538,10 @@ class UnoGame {
             return true; // Game Ended
         }
 
-        // Restart turn timer for the new current player
-        this.startTurnTimer();
+        // Restart turn timer ONLY if the leaving player was the one whose turn it was
+        if (isLeavingPlayerTurn) {
+            this.startTurnTimer();
+        }
 
         return false; // Game continues
     }

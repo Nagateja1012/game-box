@@ -19,14 +19,14 @@ const BingoStat = React.memo(({ claimedLetters }) => (
     </div>
 ));
 
-const PlayerItem = React.memo(({ p, meId, roomId, turnIndex, players, turnStartTime, turnDuration }) => {
-    const isTurn = players[turnIndex]?.id === p.id;
-    const stats = useMemo(() => [{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters} /> }], [p.claimedLetters]);
+const PlayerItem = React.memo(({ p, meUserId, roomId, turnIndex, players, turnStartTime, turnDuration }) => {
+    const isTurn = players[turnIndex]?.userId === p.userId;
+    const stats = useMemo(() => [{ icon: '', value: <BingoStat claimedLetters={p.claimedLetters || []} /> }], [p.claimedLetters]);
     const tags = useMemo(() => p.status === 'WAITING' ? ['OFFLINE'] : [], [p.status]);
 
     return (
         <TurnTimer isActive={isTurn} turnStartTime={turnStartTime} duration={turnDuration} variant="bingo" style={{ position: 'relative', width: 'auto', height: 'auto', overflow: 'visible' }}>
-            <PlayerBubble player={p} isMe={p.id === meId} roomId={roomId} isTurn={isTurn} variant="bingo" stats={stats} tags={tags} />
+            <PlayerBubble player={p} isMe={p.userId === meUserId} roomId={roomId} isTurn={isTurn} variant="bingo" stats={stats} tags={tags} />
         </TurnTimer>
     );
 });
@@ -90,8 +90,8 @@ export default function Bingo({ room, me }) {
     const contextRef = useRef({
         me,
         myGrid,
-        mePlayer: gameState.players.find(p => p.id === me.id),
-        myMarkedCells: new Set(gameState.players.find(p => p.id === me.id)?.markedCells || []),
+        mePlayer: gameState.players.find(p => p.userId === me.userId),
+        myMarkedCells: new Set(gameState.players.find(p => p.userId === me.userId)?.markedCells || []),
         setupMode,
         availableNumbers,
         isRandomMode
@@ -99,8 +99,8 @@ export default function Bingo({ room, me }) {
     contextRef.current = {
         me,
         myGrid,
-        mePlayer: gameState.players.find(p => p.id === me.id),
-        myMarkedCells: new Set(gameState.players.find(p => p.id === me.id)?.markedCells || []),
+        mePlayer: gameState.players.find(p => p.userId === me.userId),
+        myMarkedCells: new Set(gameState.players.find(p => p.userId === me.userId)?.markedCells || []),
         setupMode,
         availableNumbers,
         isRandomMode
@@ -108,7 +108,7 @@ export default function Bingo({ room, me }) {
 
     // Derived state
     const gridSize = gameState.gridSize || 5;
-    const mePlayer = gameState.players.find(p => p.id === me.id);
+    const mePlayer = gameState.players.find(p => p.userId === me.userId);
     const myMarkedCells = new Set(mePlayer?.markedCells || []);
     const alreadySetUp = mePlayer?.isReady;
 
@@ -158,9 +158,27 @@ export default function Bingo({ room, me }) {
     // Voice Announcement Logic
     useEffect(() => {
         if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !soundManager.muted) {
+            // Include lastCallTime in dependency to re-trigger same number calls
             soundManager.playSpeech(gameState.lastCalledNumber.toString(), 0.85);
         }
-    }, [gameState.lastCalledNumber, gameState.status]);
+    }, [gameState.lastCalledNumber, gameState.lastCallTime, gameState.status]);
+
+    // Claim sound for all players
+    const prevClaimedCounts = useRef({});
+    useEffect(() => {
+        if (gameState.status === 'PLAYING') {
+            gameState.players.forEach(p => {
+                const prev = prevClaimedCounts.current[p.userId] || 0;
+                const curr = p.claimedLetters?.length || 0;
+                if (curr > prev) {
+                    if (p.userId !== me.userId) {
+                        soundManager.playPop(); // Someone else claimed
+                    }
+                }
+                prevClaimedCounts.current[p.userId] = curr;
+            });
+        }
+    }, [gameState.players, gameState.status]);
 
     // Game End Sound
     const prevStatus = React.useRef(gameState.status);
@@ -182,6 +200,14 @@ export default function Bingo({ room, me }) {
 
 
     // Handlers
+    const sendGameAction = (action) => {
+        const nonce = Math.random().toString(36).substring(2, 15);
+        socket.emit('game_action', {
+            roomId: room.id,
+            action: { ...action, nonce }
+        });
+    };
+
     const handleRandomFill = (e) => {
         if (e) e.stopPropagation();
         const size = gridSize * gridSize;
@@ -199,10 +225,7 @@ export default function Bingo({ room, me }) {
     };
 
     const updateDraft = (grid) => {
-        socket.emit('game_action', {
-            roomId: room.id,
-            action: { type: 'UPDATE_DRAFT', grid }
-        });
+        sendGameAction({ type: 'UPDATE_DRAFT', grid });
     };
 
     const handleCustomFillInteraction = (index) => {
@@ -355,10 +378,7 @@ export default function Bingo({ room, me }) {
                     const SEQUENCE = ['B', 'I', 'N', 'G', 'O'];
                     if (myClaimed.length < 5) {
                         const nextLetter = SEQUENCE[myClaimed.length];
-                        socket.emit('game_action', {
-                            roomId: room.id,
-                            action: { type: 'CLAIM_LETTER', letter: nextLetter }
-                        });
+                        sendGameAction({ type: 'CLAIM_LETTER', letter: nextLetter });
                         soundManager.playSmallWin();
                     }
                 } else {
@@ -392,12 +412,13 @@ export default function Bingo({ room, me }) {
 
         if (phase === 'CALLING') {
             if (isTurn) {
-                socket.emit('game_action', { roomId: room.id, action: { type: 'CALL_NUMBER', number: num } });
+                sendGameAction({ type: 'CALL_NUMBER', number: num });
                 soundManager.playClick();
+                soundManager.playSpeech(num.toString(), 0.9);
             }
         } else if (phase === 'MARKING') {
             if (num === gs.lastCalledNumber) {
-                socket.emit('game_action', { roomId: room.id, action: { type: 'MARK_NUMBER', number: num } });
+                sendGameAction({ type: 'MARK_NUMBER', number: num });
                 soundManager.playClick();
             } else {
                 showNotification("Invalid Selection!");
@@ -468,7 +489,7 @@ export default function Bingo({ room, me }) {
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
         const bingoScores = (gameState.players || []).reduce((acc, p) => {
-            acc[p.id] = {
+            acc[p.userId] = {
                 primary: p.claimedLetters?.length || 0,
                 secondary: p.lastClaimTime || 0,
                 display: p.claimedLetters?.length || 0
@@ -482,9 +503,11 @@ export default function Bingo({ room, me }) {
             players={gameState.players}
             scores={bingoScores}
             isHost={isHost}
-            onRestart={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
+            onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
+            onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
             onClose={() => socket.emit('stop_game', { roomId: room.id })}
             onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+            meUserId={me.userId}
             title="BINGO WINNER!"
             scoreLabel="LETTERS CLAIMED"
             sortOrder="desc"
@@ -556,9 +579,9 @@ export default function Bingo({ room, me }) {
                         <div className="bottom-players">
                             {bottomPlayers.map(p => (
                                 <PlayerItem
-                                    key={p.id}
+                                    key={p.userId}
                                     p={p}
-                                    meId={me.id}
+                                    meUserId={me.userId}
                                     roomId={room.id}
                                     turnIndex={gameState.turnIndex}
                                     players={gameState.players}

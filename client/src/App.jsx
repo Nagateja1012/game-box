@@ -151,6 +151,13 @@ function App() {
     // Connect immediately
     socket.connect();
 
+    // Heartbeat Loop
+    const heartbeatInterval = setInterval(() => {
+      if (socket.connected) {
+        socket.emit('heartbeat', { userId: playerData.userId });
+      }
+    }, 5000);
+
     // Attempt reconnection if room_id exists
     const savedRoomId = localStorage.getItem('room_id');
     if (savedRoomId && playerData.name) {
@@ -166,6 +173,7 @@ function App() {
         }
       }, 5000);
       return () => {
+        clearInterval(heartbeatInterval);
         if (fallbackTimer) clearTimeout(fallbackTimer);
         socket.off('connect', onConnect);
         socket.off('disconnect', onDisconnect);
@@ -180,6 +188,7 @@ function App() {
     }
 
     return () => {
+      clearInterval(heartbeatInterval);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('room_created', onRoomCreated);
@@ -190,7 +199,7 @@ function App() {
       socket.off('connect_error', onConnectError);
       socket.disconnect();
     };
-  }, []);
+  }, [playerData.userId, playerData.name]);
 
   useEffect(() => {
     if (currentScreen === 'HOME') {

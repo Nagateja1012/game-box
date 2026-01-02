@@ -1,6 +1,7 @@
 import Uno from './uno';
 import Bingo from './bingo';
 import { UNO_RULES } from './uno/rules';
+import { BINGO_RULES } from './bingo/rules';
 
 
 export const GAME_REGISTRY = {
@@ -73,11 +74,10 @@ export const GAME_METADATA = {
         name: 'BINGO',
         description: 'Classic game of chance.',
         image: 'https://placehold.co/600x400/2980b9/ffffff?text=BINGO',
-        rules: '',
+        rules: BINGO_RULES,
         minPlayers: 2,
         maxPlayers: 20,
-        category: 'solo',
-        tags: ['dev']
+        category: 'solo'
     },
     'HOUSIE': {
         name: 'Housie',

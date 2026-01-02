@@ -3,6 +3,8 @@ import { socket } from '../socket';
 import { GAME_METADATA } from '../games/registry';
 import SanitizedInput, { VALIDATION_TYPES } from '../design-system/SanitizedInput';
 import PlayerAvatar from '../design-system/PlayerAvatar';
+import RulesOverlay from '../design-system/RulesOverlay';
+import { soundManager } from '../utils/soundManager';
 
 export default function Lobby({ room, me }) {
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -10,6 +12,7 @@ export default function Lobby({ room, me }) {
     const [searchQuery, setSearchQuery] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all'); // all, team, single
     const [copied, setCopied] = React.useState(false);
+    const [rulesGameId, setRulesGameId] = React.useState(null);
 
     const copyCode = () => {
         const link = `${window.location.origin}/?room=${room.id}`;
@@ -215,6 +218,7 @@ export default function Lobby({ room, me }) {
                                         onClick={() => !isComingSoon && isHost && socket.emit('start_game', { roomId: room.id, gameId: id })}
                                         onMouseEnter={() => !isComingSoon && setHoveredGameId(id)}
                                         onMouseLeave={() => setHoveredGameId(null)}
+                                        title={!isComingSoon && !isHost ? "Host will select the game" : ""}
                                         style={{
                                             cursor: isComingSoon ? 'not-allowed' : 'pointer',
                                             opacity: isComingSoon ? 0.7 : 1,
@@ -259,7 +263,23 @@ export default function Lobby({ room, me }) {
                                             </div>
                                             <p style={{ margin: 0, opacity: 0.6, fontSize: '0.8rem' }}>{isComingSoon ? 'Under Development' : meta.description}</p>
                                         </div>
-                                        {!isComingSoon && isHost && <span className="play-tag" style={{ opacity: isHovered ? 1 : 0, transition: 'opacity 0.2s' }}>PLAY NOW</span>}
+                                        {!isComingSoon && (
+                                            <span
+                                                className="how-to-play-tag"
+                                                style={{
+                                                    opacity: isHovered ? 1 : 0,
+                                                    transition: 'opacity 0.2s',
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    soundManager.playClick();
+                                                    setRulesGameId(id);
+                                                }}
+                                            >
+                                                HOW TO PLAY
+                                            </span>
+                                        )}
                                     </div>
                                 );
                             })
@@ -283,6 +303,13 @@ export default function Lobby({ room, me }) {
                     </div>
                 </div>
             </div>
+
+            <RulesOverlay
+                isOpen={!!rulesGameId}
+                onClose={() => setRulesGameId(null)}
+                gameName={rulesGameId ? GAME_METADATA[rulesGameId]?.name : ''}
+                rules={rulesGameId ? GAME_METADATA[rulesGameId]?.rules : ''}
+            />
         </div>
     );
 }

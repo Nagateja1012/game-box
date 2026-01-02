@@ -2,7 +2,7 @@ import React from 'react';
 
 const AVATAR_GRADIENTS = [
     'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', // Indigo to Violet (Theme)
-    'linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%)', // Blue to Teal
+    'linear-gradient(135deg, #3b82f6 0%, #d42d2d 100%)', // Blue to Teal
     'linear-gradient(135deg, #f43f5e 0%, #fb923c 100%)', // Rose to Orange
     'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)', // Violet to Pink
     'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)', // Sky to Indigo

@@ -111,6 +111,14 @@ export default function Uno({ room, me }) {
         return false;
     };
 
+    const sendGameAction = (action) => {
+        const nonce = Math.random().toString(36).substring(2, 15);
+        socket.emit('game_action', {
+            roomId: room.id,
+            action: { ...action, nonce }
+        });
+    };
+
     const handlePlayCard = (card) => {
         if (!isMyTurn) return;
 
@@ -125,20 +133,14 @@ export default function Uno({ room, me }) {
             setPendingCard(card);
             setShowColorPicker(true);
         } else {
-            socket.emit('game_action', {
-                roomId: room.id,
-                action: { type: 'PLAY_CARD', cardId: card.id }
-            });
+            sendGameAction({ type: 'PLAY_CARD', cardId: card.id });
             soundManager.playClick();
         }
     };
 
     const handleColorPick = (color) => {
         if (pendingCard) {
-            socket.emit('game_action', {
-                roomId: room.id,
-                action: { type: 'PLAY_CARD', cardId: pendingCard.id, chosenColor: color }
-            });
+            sendGameAction({ type: 'PLAY_CARD', cardId: pendingCard.id, chosenColor: color });
             soundManager.playClick();
             setShowColorPicker(false);
             setPendingCard(null);
@@ -147,27 +149,18 @@ export default function Uno({ room, me }) {
 
     const handleDraw = () => {
         if (!isMyTurn) return;
-        socket.emit('game_action', {
-            roomId: room.id,
-            action: { type: 'DRAW_CARD' }
-        });
+        sendGameAction({ type: 'DRAW_CARD' });
         soundManager.playPick();
     };
 
     const handlePass = () => {
         if (!isMyTurn) return;
-        socket.emit('game_action', {
-            roomId: room.id,
-            action: { type: 'PASS_TURN' }
-        });
+        sendGameAction({ type: 'PASS_TURN' });
         soundManager.playClick();
     };
 
     const handleUnoShout = () => {
-        socket.emit('game_action', {
-            roomId: room.id,
-            action: { type: 'UNO_SHOUT' }
-        });
+        sendGameAction({ type: 'UNO_SHOUT' });
     };
 
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -181,9 +174,11 @@ export default function Uno({ room, me }) {
                 players={gameState.players}
                 scores={gameState.scores || {}}
                 isHost={isHost}
-                onRestart={() => socket.emit('game_action', { roomId: room.id, action: { type: 'RESTART_GAME' } })}
+                onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
+                onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
                 onClose={() => socket.emit('stop_game', { roomId: room.id })}
                 onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+                meUserId={me.userId}
                 title="UNO WINNER!"
                 scoreLabel="POINTS"
                 sortOrder="asc"
