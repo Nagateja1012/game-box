@@ -88,7 +88,7 @@ function App() {
 
       if (room.status === 'PLAYING') {
         // Check if I am playing or waiting
-        const me = room.players.find(p => p.id === socket.id);
+        const me = room.players.find(p => p.userId === playerData.userId);
         if (me && me.status === 'WAITING') {
           setCurrentScreen('LOBBY');
         } else {

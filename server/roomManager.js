@@ -1,13 +1,15 @@
 const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
 const BingoGame = require('./games/bingo/logic');
+const UndercoverGame = require('./games/undercover/logic');
 
 const logger = require('./utils/logger');
 const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 
 const GAME_REGISTRY = {
     'UNO': UnoGame,
-    'BINGO': BingoGame
+    'BINGO': BingoGame,
+    'UNDERCOVER': UndercoverGame
 };
 
 function shuffleArray(array) {
@@ -191,7 +193,7 @@ class RoomManager extends EventEmitter {
 
             room.game = new GameClass();
             if (room.game.init) {
-                room.game.init(room.players);
+                room.game.init(room.players, roomId);
             }
             room.players.forEach(p => p.status = 'PLAYING');
             room.gameState = room.game.getState();

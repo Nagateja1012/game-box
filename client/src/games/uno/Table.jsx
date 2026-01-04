@@ -140,13 +140,14 @@ export default function Table({
 
             <div className="center-area" style={{
                 position: 'absolute',
-                top: '50%',
+                top: '54%',
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                zIndex: 5
+                zIndex: 500,
+                pointerEvents: 'none'
             }}>
                 {showTurnIndicator && (
                     <div style={{
@@ -154,7 +155,8 @@ export default function Table({
                         top: '-50px',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        zIndex: 10
+                        zIndex: 10,
+                        pointerEvents: 'none'
                     }}>
                         <TurnIndicator
                             isMyTurn={players[turnIndex]?.id === me.id}
@@ -164,9 +166,11 @@ export default function Table({
                     </div>
                 )}
 
-                <div className="piles-container" style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-                    <div className="deck-pile" onClick={onDraw} style={{ cursor: 'pointer' }}>
-                        <Card size="normal" />
+                <div className="piles-container" style={{ display: 'flex', gap: '30px', alignItems: 'center', pointerEvents: 'auto' }}>
+                    <div className="deck-pile" onClick={onDraw} style={{ cursor: 'pointer', position: 'relative' }}>
+                        <div style={{ pointerEvents: 'none' }}>
+                            <Card size="normal" />
+                        </div>
                     </div>
 
                     {drawStack > 0 && (

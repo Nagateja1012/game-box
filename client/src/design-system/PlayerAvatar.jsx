@@ -28,6 +28,7 @@ const getAvatarGradient = (name) => {
 };
 
 const SIZES = {
+    xs: { size: '20px', fontSize: '0.6rem' },
     sm: { size: '24px', fontSize: '0.7rem' },
     md: { size: '36px', fontSize: '0.8rem' },
     lg: { size: '60px', fontSize: '1.25rem' }
@@ -64,6 +65,7 @@ export default function PlayerAvatar({
                     fontSize: dimensions.fontSize,
                     fontWeight: 'bold',
                     color: 'white',
+                    lineHeight: 1,
                     boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                     border: '2px solid rgba(255,255,255,0.2)',
                     overflow: 'hidden'

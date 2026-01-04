@@ -78,48 +78,64 @@ export default function GameOverOverlay({
                         justifyContent: 'center',
                         gap: '20px'
                     }}>
-                        <PlayerAvatar name={winner.name} size="lg" />
+                        {players.some(p => p.name === winner.name) && <PlayerAvatar name={winner.name} size="lg" />}
                         <h2 style={{ fontSize: '2rem', margin: 0 }}>{winner.name}</h2>
                     </div>
                 )}
 
-                {Object.keys(scores).length > 0 && (
-                    <div className="scores-board" style={{
-                        margin: '20px 0',
-                        background: 'rgba(255,255,255,0.05)',
-                        padding: '20px',
-                        borderRadius: '20px',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        maxHeight: '30vh',
-                        overflowY: 'auto'
-                    }}>
+                <div className="scores-board" style={{
+                    margin: '20px 0',
+                    background: 'rgba(255,255,255,0.05)',
+                    padding: '20px',
+                    borderRadius: '20px',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    maxHeight: '35vh',
+                    overflowY: 'auto'
+                }}>
+                    {scoreLabel && scoreLabel !== 'NONE' && (
                         <h3 style={{ marginBottom: '15px', opacity: 0.7 }}>{scoreLabel}</h3>
-                        {sortedPlayers.map((p, i) => (
-                            <div key={p.id} style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                padding: '10px 0',
-                                borderBottom: i === sortedPlayers.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                                fontWeight: i === 0 ? 'bold' : 'normal',
-                                color: i === 0 ? '#f1c40f' : '#fff'
-                            }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <span style={{ opacity: 0.5 }}>#{i + 1}</span>
-                                    <span>{p.name}</span>
-                                </div>
-                                <span>{p.displayScore}</span>
+                    )}
+                    {sortedPlayers.map((p, i) => (
+                        <div key={p.userId || p.id} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px 0',
+                            borderBottom: i === sortedPlayers.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                            fontWeight: (Object.keys(scores).length > 0 && i === 0) ? 'bold' : 'normal',
+                            color: (Object.keys(scores).length > 0 && i === 0) ? '#f1c40f' : '#fff'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                {Object.keys(scores).length > 0 && (
+                                    <span style={{ opacity: 0.5, fontSize: '0.9rem', minWidth: '25px' }}>#{i + 1}</span>
+                                )}
+                                <PlayerAvatar name={p.name} size="sm" />
+                                <span style={{ fontSize: '1.1rem' }}>{p.name}</span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                {Object.keys(scores).length > 0 && (
+                                    <span style={{ fontSize: '1.1rem' }}>{p.displayScore}</span>
+                                )}
                                 {p.wantsRematch && (
-                                    <span style={{ marginLeft: '10px', color: '#4ade80' }} title="Voted to Play Again">
-                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <div style={{
+                                        color: '#4ade80',
+                                        background: 'rgba(74, 222, 128, 0.1)',
+                                        padding: '4px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: '1px solid rgba(74, 222, 128, 0.3)'
+                                    }} title="Voted to Play Again">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                             <polyline points="20 6 9 17 4 12"></polyline>
                                         </svg>
-                                    </span>
+                                    </div>
                                 )}
                             </div>
-                        ))}
-                    </div>
-                )}
+                        </div>
+                    ))}
+                </div>
 
                 <div className="actions" style={{
                     display: 'flex',

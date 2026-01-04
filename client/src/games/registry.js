@@ -1,12 +1,15 @@
 import Uno from './uno';
 import Bingo from './bingo';
+import Undercover from './undercover';
 import { UNO_RULES } from './uno/rules';
 import { BINGO_RULES } from './bingo/rules';
+import { UNDERCOVER_RULES } from './undercover/rules';
 
 
 export const GAME_REGISTRY = {
     'UNO': Uno,
-    'BINGO': Bingo
+    'BINGO': Bingo,
+    'UNDERCOVER': Undercover
 };
 
 export const GAME_METADATA = {
@@ -16,7 +19,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/2c3e50/ffffff?text=EXPLODING+KITTENS',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 5,
+        maxPlayers: 12,
         category: 'solo',
         tags: ['dev']
     },
@@ -56,8 +59,8 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/95a5a6/ffffff?text=Magnets',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 4,
-        category: 'solo',
+        maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'CONNECT_DOTS': {
@@ -66,7 +69,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/16a085/ffffff?text=Dots',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 4,
+        maxPlayers: 12,
         category: 'solo',
         tags: ['dev']
     },
@@ -76,7 +79,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/2980b9/ffffff?text=BINGO',
         rules: BINGO_RULES,
         minPlayers: 2,
-        maxPlayers: 20,
+        maxPlayers: 12,
         category: 'solo'
     },
     'HOUSIE': {
@@ -85,7 +88,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/8e44ad/ffffff?text=Housie',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 20,
+        maxPlayers: 12,
         category: 'solo',
         tags: ['dev']
     },
@@ -93,11 +96,10 @@ export const GAME_METADATA = {
         name: 'Undercover',
         description: 'Find the spy among you.',
         image: 'https://placehold.co/600x400/2c3e50/ffffff?text=Undercover',
-        rules: '',
+        rules: UNDERCOVER_RULES,
         minPlayers: 3,
         maxPlayers: 12,
-        category: 'team',
-        tags: ['dev']
+        category: 'solo'
     },
     'WHO_AM_I': {
         name: 'Who am I',
@@ -115,7 +117,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/c0392b/ffffff?text=Werewolf',
         rules: '',
         minPlayers: 5,
-        maxPlayers: 15,
+        maxPlayers: 12,
         category: 'team',
         tags: ['dev']
     },
@@ -125,8 +127,8 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/d35400/ffffff?text=SquidGame',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 20,
-        category: 'solo',
+        maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'FUNGI': {
@@ -135,8 +137,8 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/27ae60/ffffff?text=Fungi',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 2,
-        category: 'solo',
+        maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'CHAIN_REACTION': {
@@ -145,8 +147,8 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/e74c3c/ffffff?text=Chain+Reaction',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 8,
-        category: 'solo',
+        maxPlayers: 12,
+        category: 'team',
         tags: ['dev']
     },
     'LEAST_COUNT': {
@@ -155,7 +157,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/7f8c8d/ffffff?text=Least+Count',
         rules: '',
         minPlayers: 2,
-        maxPlayers: 6,
+        maxPlayers: 12,
         category: 'solo',
         tags: ['dev']
     },
@@ -165,7 +167,7 @@ export const GAME_METADATA = {
         image: 'https://placehold.co/600x400/34495e/ffffff?text=Bluff',
         rules: '',
         minPlayers: 3,
-        maxPlayers: 10,
+        maxPlayers: 12,
         category: 'solo',
         tags: ['dev']
     }
