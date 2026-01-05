@@ -2,6 +2,7 @@ const EventEmitter = require('events');
 const UnoGame = require('./games/uno/logic');
 const BingoGame = require('./games/bingo/logic');
 const UndercoverGame = require('./games/undercover/logic');
+const FungiGame = require('./games/fungi/logic');
 
 const logger = require('./utils/logger');
 const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
@@ -9,7 +10,8 @@ const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
 const GAME_REGISTRY = {
     'UNO': UnoGame,
     'BINGO': BingoGame,
-    'UNDERCOVER': UndercoverGame
+    'UNDERCOVER': UndercoverGame,
+    'FUNGI': FungiGame
 };
 
 function shuffleArray(array) {

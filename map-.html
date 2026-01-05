@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Pacman Map Editor</title>
+    <style>
+        body {
+            display: flex;
+            gap: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea {
+            width: 320px;
+            height: 620px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+
+        canvas {
+            border: 2px solid #333;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+
+<body>
+
+    <textarea id="mapInput"></textarea>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const TILE_SIZE = 20;
+
+        const colors = {
+            0: "#000000", // Path
+            1: "#0033ff", // Wall
+            2: "#ff00ff", // Trojan Loop
+            3: "#00ff00", // Fungi
+            4: "#ff0000", // Antibiotics
+            5: "#ffff00", // Side Wrap
+            6: "#444444", // Ghost Home
+            7: "#ffffff", // Player
+            8: "#ffa500", // Power
+            9: "#F52F59",  // Empty
+            A: "#F39F59",  // Empty
+            B: "#G59F39"   // Empty
+        };
+
+        const defaultLayout = [
+            "1111111111111111111111111111",
+            "1000000000000000000000000001",
+            "1011111111110110111111111101",
+            "1011110111110110111110111101",
+            "1011110111110110111110111101",
+            "1000000000000000000000000001",
+            "1011110110111111110110111101",
+            "1011110110111111110110111101",
+            "1000000110000110000110000001",
+            "1111110111110110111110111111",
+
+            // 👻 Ghost house (sealed properly)
+            "6666610111110110111110166666",
+            "6666610110000000000110166666",
+            "6666610110116666110110166666",
+            "1111110110166666610110111111",
+
+            // 🚪 Side wrap + player + power
+            "5000000000100708010000000005",
+
+            // 🔒 Ghost exit funnel
+            "1111110110166666610110111111",
+            "6666610110116666110110166666",
+            "6666610110000000000110166666",
+            "6666610111110110111110166666",
+
+            "1111110110111111110110111111",
+            "1000000000000110000000000001",
+            "1011110111110110111110111101",
+            "1011110111110110111110111101",
+            "1000110000000000000000110001",
+            "1110110110111111110110110111",
+            "1110110110111111110110110111",
+            "1000000110000110000110000001",
+            "1011111111110110111111111101",
+            "1011111111110110111111111101",
+            "1000000000000000000000000001",
+            "1111111111111111111111111111"
+        ];
+
+        const textarea = document.getElementById("mapInput");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        textarea.value = defaultLayout.join("\n");
+
+        function draw() {
+            const rows = textarea.value.trim().split("\n");
+            const cols = rows[0].length;
+
+            canvas.width = cols * TILE_SIZE;
+            canvas.height = rows.length * TILE_SIZE;
+
+            rows.forEach((row, y) => {
+                row.split("").forEach((cell, x) => {
+                    ctx.fillStyle = colors[cell] || "#000";
+                    ctx.fillRect(
+                        x * TILE_SIZE,
+                        y * TILE_SIZE,
+                        TILE_SIZE,
+                        TILE_SIZE
+                    );
+                });
+            });
+        }
+
+        // 🔁 Live update on edit
+        textarea.addEventListener("input", draw);
+
+        // 🖱️ Click to cycle tiles
+        canvas.addEventListener("click", e => {
+            const rows = textarea.value.split("\n");
+            const x = Math.floor(e.offsetX / TILE_SIZE);
+            const y = Math.floor(e.offsetY / TILE_SIZE);
+
+            let val = parseInt(rows[y][x]);
+            val = (val + 1) % 9;
+
+            rows[y] =
+                rows[y].substring(0, x) +
+                val +
+                rows[y].substring(x + 1);
+
+            textarea.value = rows.join("\n");
+            draw();
+        });
+
+        draw();
+    </script>
+
+</body>
+
+</html>

@@ -1,6 +1,8 @@
 import Uno from './uno';
 import Bingo from './bingo';
 import Undercover from './undercover';
+import Fungi from './fungi';
+const FUNGI_RULES = "Team up and corner opposite players. If two players from your team are within 2 units of an enemy, they convert to your team! Collect powerups like Trojan, Invert, Clone, and Ghost to gain an advantage.";
 import { UNO_RULES } from './uno/rules';
 import { BINGO_RULES } from './bingo/rules';
 import { UNDERCOVER_RULES } from './undercover/rules';
@@ -9,7 +11,8 @@ import { UNDERCOVER_RULES } from './undercover/rules';
 export const GAME_REGISTRY = {
     'UNO': Uno,
     'BINGO': Bingo,
-    'UNDERCOVER': Undercover
+    'UNDERCOVER': Undercover,
+    'FUNGI': Fungi
 };
 
 export const GAME_METADATA = {
@@ -133,10 +136,10 @@ export const GAME_METADATA = {
     },
     'FUNGI': {
         name: 'Fungi',
-        description: 'Mushroom foraging game.',
+        description: 'Team up to convert your enemies in this 2D strategy game!',
         image: 'https://placehold.co/600x400/27ae60/ffffff?text=Fungi',
-        rules: '',
-        minPlayers: 2,
+        rules: FUNGI_RULES,
+        minPlayers: 1,
         maxPlayers: 12,
         category: 'team',
         tags: ['dev']
