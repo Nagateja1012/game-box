@@ -3,6 +3,8 @@ import { socket } from '../socket';
 import { GAME_METADATA } from '../games/registry';
 import SanitizedInput, { VALIDATION_TYPES } from '../design-system/SanitizedInput';
 import PlayerAvatar from '../design-system/PlayerAvatar';
+import RulesOverlay from '../design-system/RulesOverlay';
+import { soundManager } from '../utils/soundManager';
 
 export default function Lobby({ room, me }) {
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -10,6 +12,8 @@ export default function Lobby({ room, me }) {
     const [searchQuery, setSearchQuery] = React.useState('');
     const [categoryFilter, setCategoryFilter] = React.useState('all'); // all, team, single
     const [copied, setCopied] = React.useState(false);
+    const [rulesGameId, setRulesGameId] = React.useState(null);
+    const [startError, setStartError] = React.useState('');
 
     const copyCode = () => {
         const link = `${window.location.origin}/?room=${room.id}`;
@@ -24,6 +28,27 @@ export default function Lobby({ room, me }) {
 
     const [hoveredGameId, setHoveredGameId] = React.useState(null);
 
+    const checkStartEligibility = (gameId) => {
+        const meta = GAME_METADATA[gameId];
+        if (!meta) return true;
+
+        const min = meta.minPlayers || 1;
+        if (room.players.length < min) {
+            setStartError(`This game requires at least ${min} players.`);
+            soundManager.playInvalid();
+            setTimeout(() => setStartError(''), 3000);
+            return false;
+        }
+        return true;
+    };
+
+    const handleStartGame = (gameId) => {
+        if (!isHost) return;
+        if (checkStartEligibility(gameId)) {
+            socket.emit('start_game', { roomId: room.id, gameId });
+        }
+    };
+
     const handleRandomGame = () => {
         if (!isHost) return;
         const playableGames = Object.entries(GAME_METADATA).filter(([id, meta]) => {
@@ -32,7 +57,7 @@ export default function Lobby({ room, me }) {
             return !(isProd && isDev);
         });
         const randomId = playableGames[Math.floor(Math.random() * playableGames.length)][0];
-        socket.emit('start_game', { roomId: room.id, gameId: randomId });
+        handleStartGame(randomId);
     };
 
     const filteredGames = Object.entries(GAME_METADATA)
@@ -212,9 +237,10 @@ export default function Lobby({ room, me }) {
                                     <div
                                         key={id}
                                         className={`game-card ${isComingSoon ? 'coming-soon' : ''}`}
-                                        onClick={() => !isComingSoon && isHost && socket.emit('start_game', { roomId: room.id, gameId: id })}
+                                        onClick={() => !isComingSoon && handleStartGame(id)}
                                         onMouseEnter={() => !isComingSoon && setHoveredGameId(id)}
                                         onMouseLeave={() => setHoveredGameId(null)}
+                                        title={!isComingSoon && !isHost ? "Host will select the game" : ""}
                                         style={{
                                             cursor: isComingSoon ? 'not-allowed' : 'pointer',
                                             opacity: isComingSoon ? 0.7 : 1,
@@ -259,7 +285,23 @@ export default function Lobby({ room, me }) {
                                             </div>
                                             <p style={{ margin: 0, opacity: 0.6, fontSize: '0.8rem' }}>{isComingSoon ? 'Under Development' : meta.description}</p>
                                         </div>
-                                        {!isComingSoon && isHost && <span className="play-tag" style={{ opacity: isHovered ? 1 : 0, transition: 'opacity 0.2s' }}>PLAY NOW</span>}
+                                        {!isComingSoon && (
+                                            <span
+                                                className="how-to-play-tag"
+                                                style={{
+                                                    opacity: isHovered ? 1 : 0,
+                                                    transition: 'opacity 0.2s',
+                                                    cursor: 'pointer'
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    soundManager.playClick();
+                                                    setRulesGameId(id);
+                                                }}
+                                            >
+                                                HOW TO PLAY
+                                            </span>
+                                        )}
                                     </div>
                                 );
                             })
@@ -283,6 +325,35 @@ export default function Lobby({ room, me }) {
                     </div>
                 </div>
             </div>
+
+            {startError && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '40px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: '#ef4444',
+                    color: 'white',
+                    padding: '12px 24px',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    boxShadow: '0 10px 30px rgba(239, 68, 68, 0.4)',
+                    animation: 'slideUpFade 0.3s ease-out',
+                    zIndex: 1000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                }}>
+                    <span>⚠️</span> {startError}
+                </div>
+            )}
+
+            <RulesOverlay
+                isOpen={!!rulesGameId}
+                onClose={() => setRulesGameId(null)}
+                gameName={rulesGameId ? GAME_METADATA[rulesGameId]?.name : ''}
+                rules={rulesGameId ? GAME_METADATA[rulesGameId]?.rules : ''}
+            />
         </div>
     );
 }

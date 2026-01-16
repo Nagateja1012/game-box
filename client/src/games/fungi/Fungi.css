@@ -1,0 +1,155 @@
+.fungi-container {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #020205;
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(0, 168, 175, 0.1) 0%, transparent 70%),
+        linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%),
+        linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+    background-size: 100% 100%, 100% 4px, 3px 100%;
+    overflow: hidden;
+    position: relative;
+    font-family: 'Outfit', 'Inter', sans-serif;
+}
+
+.fungi-container::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    background: rgba(18, 16, 16, 0.1);
+    opacity: 0;
+    z-index: 2;
+    pointer-events: none;
+    animation: flicker 0.15s infinite;
+}
+
+@keyframes flicker {
+    0% {
+        opacity: 0.1;
+    }
+
+    100% {
+        opacity: 0.2;
+    }
+}
+
+.fungi-board-wrapper {
+    position: relative;
+    background-color: rgba(0, 0, 0, 0.9);
+    box-shadow: 0 0 40px rgba(0, 168, 175, 0.2), inset 0 0 20px rgba(0, 168, 175, 0.1);
+    border: 1px solid rgba(0, 168, 175, 0.3);
+    border-radius: 4px;
+}
+
+.fungi-player-container {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+}
+
+.player-symbol {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: 0 0 15px currentColor;
+    border: 2px solid currentColor;
+}
+
+.team-fungi {
+    color: #00ffcc;
+    text-shadow: 0 0 10px #00ffcc;
+}
+
+.team-antibo {
+    color: #ff00ff;
+    text-shadow: 0 0 10px #ff00ff;
+}
+
+.player-symbol::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    opacity: 0.5;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+.effect-invert {
+    position: absolute;
+    top: -20px;
+    font-size: 1rem;
+    filter: drop-shadow(0 0 5px #f0f);
+}
+
+.effect-ghost {
+    position: absolute;
+    bottom: -20px;
+    font-size: 1rem;
+    opacity: 0.6;
+    filter: drop-shadow(0 0 5px #0ff);
+}
+
+.loop-progress-container {
+    position: absolute;
+    top: -10px;
+    width: 30px;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+}
+
+.loop-progress-bar {
+    height: 100%;
+    background: #e74c3c;
+    border-radius: 2px;
+}
+
+.clone {
+    pointer-events: none;
+    filter: sepia(1) saturate(5) hue-rotate(90deg);
+}
+
+@keyframes bounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+.fungi-player-container .player-bubble {
+    transform: scale(0.6);
+    pointer-events: none;
+}

@@ -13,6 +13,7 @@ class BingoGame {
 
             calledNumbers: [],
             lastCalledNumber: null,
+            lastCallTime: 0,
             winner: null,
             gridSize: 5,
             winningPatterns: []
@@ -26,14 +27,16 @@ class BingoGame {
 
     init(players) {
         this.players = players.map(p => ({
-            ...p,
+            ...p, // Contains id (socket), userId, name
             grid: [],
             draftGrid: [],
             markedCells: [],
             claimedLetters: [],
             lastClaimTime: 0,
             isReady: false,
-            score: 0
+            score: 0,
+            wantsRematch: false,
+            connected: true
         }));
 
         this.gameState.gridSize = this.calculateGridSize(this.players.length);
@@ -125,8 +128,10 @@ class BingoGame {
     }
 
     handleAction(action, player) {
-        const gamePlayer = this.players.find(p => p.id === player.id);
+        const gamePlayer = this.players.find(p => p.userId === player.userId);
         if (!gamePlayer) return false;
+        const playerIndex = this.players.findIndex(p => p.userId === player.userId);
+
 
         switch (action.type) {
             case 'UPDATE_DRAFT':
@@ -141,7 +146,7 @@ class BingoGame {
             case 'CALL_NUMBER':
                 if (this.gameState.status !== 'PLAYING') return false;
                 // Only Active Player can call
-                if (this.players[this.gameState.turnIndex].id !== player.id) return false;
+                if (this.players[this.gameState.turnIndex]?.userId !== player.userId) return false;
                 // Only in CALLING phase
                 if (this.gameState.turnPhase !== 'CALLING') return false;
 
@@ -149,14 +154,13 @@ class BingoGame {
 
             case 'MARK_NUMBER':
                 if (this.gameState.status !== 'PLAYING') return false;
-                // Only in MARKING phase
                 if (this.gameState.turnPhase !== 'MARKING') return false;
 
-                // Validate matches last called
-                if (this.gameState.lastCalledNumber && action.number === this.gameState.lastCalledNumber) {
-                    if (!gamePlayer.markedCells.includes(action.number)) {
-                        gamePlayer.markedCells.push(action.number);
-                        this.emitStateChange(); // Broadcast mark
+                const markNum = Number(action.number);
+                if (this.gameState.lastCalledNumber && markNum === this.gameState.lastCalledNumber) {
+                    if (!gamePlayer.markedCells.includes(markNum)) {
+                        gamePlayer.markedCells.push(markNum);
+                        this.emitStateChange();
                         return true;
                     }
                 }
@@ -165,6 +169,19 @@ class BingoGame {
             case 'CLAIM_LETTER':
                 if (this.gameState.status !== 'PLAYING') return false;
                 return this.claimLetter(gamePlayer, action.letter);
+
+            case 'VOTE_PLAY_AGAIN':
+                gamePlayer.wantsRematch = true;
+                // Check if all CONNECTED players want rematch
+                const activePlayers = this.players.filter(p => p.connected);
+                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
+                    this.restartGame(playerIndex, true);
+                }
+                this.emitStateChange();
+                return true;
+
+            case 'RESTART_GAME':
+                return this.restartGame(playerIndex);
         }
         return false;
     }
@@ -181,12 +198,15 @@ class BingoGame {
         // Ensure caller has it? Theoretically yes.
         if (!caller || !caller.grid.includes(number)) return false;
 
-        this.gameState.calledNumbers.push(number);
-        this.gameState.lastCalledNumber = number;
+        const num = Number(number);
+        console.log(`BINGO: Player ${caller.name} (${caller.userId}) called number ${num}`);
+        this.gameState.calledNumbers.push(num);
+        this.gameState.lastCalledNumber = num;
+        this.gameState.lastCallTime = Date.now();
 
         // Auto-mark for CALLER
-        if (!caller.markedCells.includes(number)) {
-            caller.markedCells.push(number);
+        if (!caller.markedCells.includes(num)) {
+            caller.markedCells.push(num);
         }
 
         // Switch Phase to MARKING
@@ -203,17 +223,24 @@ class BingoGame {
         const SEQUENCE = ['B', 'I', 'N', 'G', 'O'];
         const targetLetter = SEQUENCE[targetIndex];
 
-        if (letter !== targetLetter) return false;
+        console.log(`BINGO: Claim attempt by ${player.name} (${player.userId}) for letter ${letter}. Expected: ${targetLetter}`);
 
-        // Verify they actually have the lines
-        // For simplicity, we assume client sends valid claims, but we should eventually validate.
-        // Assuming we rely on calculateCompletedLines Logic:
+        if (letter !== targetLetter) {
+            console.log(`BINGO: Claim REJECTED (wrong letter sequence)`);
+            return false;
+        }
+
         const completedLines = this.calculateCompletedLines(player);
-        if (completedLines > player.claimedLetters.length) {
+        const currentCount = player.claimedLetters.length;
+        console.log(`BINGO: Claim check: completedLines=${completedLines}, alreadyClaimed=${currentCount}`);
+
+        if (completedLines > currentCount) {
             player.claimedLetters.push(letter);
             player.lastClaimTime = Date.now();
+            console.log(`BINGO: Claim SUCCESS! Player now has: ${player.claimedLetters.join('')}`);
 
             if (player.claimedLetters.length === 5) {
+                console.log(`BINGO: GAME OVER! ${player.name} wins!`);
                 this.gameState.winner = player;
                 this.gameState.status = 'ENDED';
                 if (this.turnTimer) clearTimeout(this.turnTimer);
@@ -222,6 +249,7 @@ class BingoGame {
             return true;
         }
 
+        console.log(`BINGO: Claim REJECTED (insufficient lines)`);
         return false;
     }
 
@@ -265,8 +293,10 @@ class BingoGame {
     calculateCompletedLines(player) {
         let lines = 0;
         const size = this.gameState.gridSize;
-        const grid = player.grid;
-        const marked = new Set(player.markedCells);
+        const grid = (player.grid || []).map(Number);
+        const marked = new Set((player.markedCells || []).map(Number));
+
+        if (!grid || grid.length !== size * size) return 0;
 
         // Rows
         for (let r = 0; r < size; r++) {
@@ -300,23 +330,7 @@ class BingoGame {
         return lines;
     }
 
-    removePlayer(playerId) {
-        const index = this.players.findIndex(p => p.id === playerId);
-        if (index !== -1) {
-            if (this.gameState.status === 'PLAYING' && index === this.gameState.turnIndex) {
-                // If active player leaves, skip them
-                // Just restart turn logic with new index
-                this.gameState.turnIndex = (this.gameState.turnIndex) % (this.players.length - 1);
-                this.startTurn();
-            }
-            this.players.splice(index, 1);
-            if (this.players.length === 0) {
-                this.stop();
-                return true;
-            }
-        }
-        return false;
-    }
+
 
     removePlayer(playerId) {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
@@ -364,21 +378,69 @@ class BingoGame {
     getState() {
         return {
             ...this.gameState,
+            winner: this.gameState.winner ? {
+                userId: this.gameState.winner.userId,
+                name: this.gameState.winner.name
+            } : null,
             players: this.players.map(p => ({
                 id: p.id,
+                userId: p.userId,
                 name: p.name,
                 isHost: p.isHost,
                 claimedLetters: p.claimedLetters,
                 lastClaimTime: p.lastClaimTime,
                 isReady: p.isReady,
                 grid: p.grid,
-                markedCells: p.markedCells
+                markedCells: p.markedCells,
+                wantsRematch: p.wantsRematch,
+                connected: p.connected
             }))
         };
     }
 
     emitStateChange() {
         if (this.onStateChange) this.onStateChange();
+    }
+
+    restartGame(playerIndex, force = false) {
+        // Stop timers
+        this.stop();
+
+        // Reset game state
+        this.gameState = {
+            status: 'SETUP',
+            turnIndex: 0,
+            turnStartTime: 0,
+            turnDuration: 0,
+            turnPhase: null,
+            calledNumbers: [],
+            lastCalledNumber: null,
+            winner: null,
+            gridSize: 5,
+            winningPatterns: []
+        };
+
+        // Re-init with current players
+        this.init(this.players);
+        this.emitStateChange();
+        return true;
+    }
+
+    updatePlayerStatus(userId, status) {
+        const player = this.players.find(p => p.userId === userId);
+        if (player) {
+            player.connected = status.connected;
+            if (status.id) player.id = status.id;
+
+            // Unanimous rematch check on disconnect
+            if (this.gameState.status === 'ENDED') {
+                const activePlayers = this.players.filter(p => p.connected);
+                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
+                    this.restartGame(0, true);
+                }
+            }
+            this.emitStateChange();
+        }
     }
 
     on(event, callback) {

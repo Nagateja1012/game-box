@@ -2,7 +2,7 @@ import React from 'react';
 
 const AVATAR_GRADIENTS = [
     'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)', // Indigo to Violet (Theme)
-    'linear-gradient(135deg, #3b82f6 0%, #2dd4bf 100%)', // Blue to Teal
+    'linear-gradient(135deg, #3b82f6 0%, #d42d2d 100%)', // Blue to Teal
     'linear-gradient(135deg, #f43f5e 0%, #fb923c 100%)', // Rose to Orange
     'linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%)', // Violet to Pink
     'linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%)', // Sky to Indigo
@@ -28,6 +28,7 @@ const getAvatarGradient = (name) => {
 };
 
 const SIZES = {
+    xs: { size: '20px', fontSize: '0.6rem' },
     sm: { size: '24px', fontSize: '0.7rem' },
     md: { size: '36px', fontSize: '0.8rem' },
     lg: { size: '60px', fontSize: '1.25rem' }
@@ -64,6 +65,7 @@ export default function PlayerAvatar({
                     fontSize: dimensions.fontSize,
                     fontWeight: 'bold',
                     color: 'white',
+                    lineHeight: 1,
                     boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
                     border: '2px solid rgba(255,255,255,0.2)',
                     overflow: 'hidden'

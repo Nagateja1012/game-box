@@ -165,6 +165,15 @@ function setupSocketHandlers(io, socket) {
         }
     });
 
+    // Heartbeat
+    socket.on('heartbeat', ({ userId }) => {
+        try {
+            roomManager.updateHeartbeat(socket.id, userId);
+        } catch (error) {
+            // Low priority error, don't spam logs
+        }
+    });
+
     // Disconnect
     socket.on('disconnect', () => {
         try {
