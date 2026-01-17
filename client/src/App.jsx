@@ -5,6 +5,7 @@ import Home from './screens/Home';
 import Lobby from './screens/Lobby';
 import GameContainer from './screens/GameContainer';
 import ErrorBoundary from './components/ErrorBoundary';
+import FeedbackButton from './design-system/FeedbackButton';
 import './App.css';
 
 function App() {
@@ -279,6 +280,8 @@ function App() {
         {currentScreen === 'HOME' && (<p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '-20px', marginBottom: '20px' }}>
           Developed by Teja Dasari using google Antigravity & Gemini
         </p>)}
+
+        <FeedbackButton me={playerData} />
       </div>
     </ErrorBoundary>
   );
