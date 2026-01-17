@@ -5,12 +5,18 @@ import Home from './screens/Home';
 import Lobby from './screens/Lobby';
 import GameContainer from './screens/GameContainer';
 import ErrorBoundary from './components/ErrorBoundary';
+import FeedbackButton from './design-system/FeedbackButton';
 import './App.css';
 
 function App() {
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [currentScreen, setCurrentScreen] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomUrlParam = params.get('room');
     const savedRoomId = localStorage.getItem('room_id');
+
+    // If there's a room in the URL, prioritize HOME screen so they can join it
+    if (roomUrlParam) return 'HOME';
     return savedRoomId ? 'RESTORING' : 'HOME';
   });
   const [playerData, setPlayerData] = useState(() => {
@@ -31,15 +37,22 @@ function App() {
   }, [currentScreen]);
 
   const handleExitRoom = (keepError = false) => {
+    const params = new URLSearchParams(window.location.search);
+    const roomUrlParam = params.get('room');
+    const savedRoomId = localStorage.getItem('room_id');
+
     setRoomData(null);
     setCurrentScreen('HOME');
     localStorage.removeItem('room_id');
     if (!keepError) setError('');
 
-    // Clear room code from URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('room');
-    window.history.replaceState({}, '', url.pathname + url.search);
+    // Only clear room code from URL if it matches the room we just left/failed to join
+    // This preserves new room codes if we were trying to join from a link
+    if (roomUrlParam === savedRoomId || !roomUrlParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('room');
+      window.history.replaceState({}, '', url.pathname + url.search);
+    }
   };
 
   const handleLogin = (name) => {
@@ -158,9 +171,12 @@ function App() {
       }
     }, 5000);
 
-    // Attempt reconnection if room_id exists
+    // Attempt reconnection if room_id exists AND there isn't a conflicting URL param
     const savedRoomId = localStorage.getItem('room_id');
-    if (savedRoomId && playerData.name) {
+    const params = new URLSearchParams(window.location.search);
+    const roomUrlParam = params.get('room');
+
+    if (savedRoomId && playerData.name && (!roomUrlParam || roomUrlParam === savedRoomId)) {
       console.log("Attempting to reconnect to room:", savedRoomId);
       socket.emit('join_room', { roomId: savedRoomId, playerName: playerData.name, userId: playerData.userId });
 
@@ -264,6 +280,8 @@ function App() {
         {currentScreen === 'HOME' && (<p style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '-20px', marginBottom: '20px' }}>
           Developed by Teja Dasari using google Antigravity & Gemini
         </p>)}
+
+        <FeedbackButton me={playerData} />
       </div>
     </ErrorBoundary>
   );

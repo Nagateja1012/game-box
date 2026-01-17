@@ -119,13 +119,19 @@ export default function Bingo({ room, me }) {
         }
     }, [alreadySetUp, mePlayer]);
 
+    // Initialize and Sync Grid Size
     useEffect(() => {
-        if (setupMode === 'CUSTOM' && availableNumbers.length === 0 && myGrid.length === 0) {
-            const size = gridSize * gridSize;
-            setAvailableNumbers(Array.from({ length: size }, (_, i) => i + 1));
-            setMyGrid(createEmptyGrid(gridSize));
+        if (setupMode === 'CUSTOM') {
+            const expectedSize = gridSize * gridSize;
+            // If grid is empty or has wrong size, initialize/reset it
+            if (myGrid.length !== expectedSize) {
+                console.log(`BINGO: Resizing grid from ${myGrid.length} to ${expectedSize}`);
+                setAvailableNumbers(Array.from({ length: expectedSize }, (_, i) => i + 1));
+                setMyGrid(createEmptyGrid(gridSize));
+                setIsRandomMode(false); // Reset random mode if size changes
+            }
         }
-    }, [setupMode, gridSize, availableNumbers.length, myGrid.length]);
+    }, [setupMode, gridSize, myGrid.length]);
 
     // Notification Helper
     const notificationTimeoutRef = useRef(null);
@@ -486,6 +492,14 @@ export default function Bingo({ room, me }) {
         </div>
     ) : null;
 
+    const handleDeclineReplay = () => {
+        const nonce = Math.random().toString(36).substring(2, 15);
+        socket.emit('game_action', {
+            roomId: room.id,
+            action: { type: 'DECLINE_PLAY_AGAIN', nonce }
+        });
+    };
+
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
         const bingoScores = (gameState.players || []).reduce((acc, p) => {
@@ -506,7 +520,9 @@ export default function Bingo({ room, me }) {
             onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
             onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
             onClose={() => socket.emit('stop_game', { roomId: room.id })}
-            onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+            onLeave={() => {
+                handleDeclineReplay();
+            }}
             meUserId={me.userId}
             title="BINGO WINNER!"
             scoreLabel="LETTERS CLAIMED"

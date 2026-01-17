@@ -15,6 +15,7 @@ class UnoGame {
         this.stackType = null; // 'DRAW_TWO' or 'WILD_DRAW_FOUR'
         this.scores = {};
         this.lastUnoShout = null; // { playerId, name, time }
+        this.rematchCancelled = false;
 
         // Turn timer configuration
         this.turnDuration = 22000; // 30 seconds per turn
@@ -35,6 +36,7 @@ class UnoGame {
             isUno: false,
             hasDrawn: false,
             wantsRematch: false,
+            declinedRematch: false,
             connected: true
         }));
 
@@ -159,12 +161,11 @@ class UnoGame {
             case 'VOTE_PLAY_AGAIN':
                 gamePlayer.wantsRematch = true;
                 logger.info(`Player ${gamePlayer.name} voted to play again`);
-                // Check if all CONNECTED players want rematch
-                const activePlayers = this.players.filter(p => p.connected);
-                if (activePlayers.every(p => p.wantsRematch)) {
-                    logger.info('All connected players voted for rematch. Restarting game.');
-                    this.restartGame(playerIndex, true); // true = force because voting
-                }
+                this.checkRematchDecided();
+                return true;
+            case 'DECLINE_PLAY_AGAIN':
+                gamePlayer.declinedRematch = true;
+                this.checkRematchDecided();
                 return true;
             default:
                 logger.warn(`Unknown action type: ${action.type}`);
@@ -407,6 +408,7 @@ class UnoGame {
         this.winner = null;
         this.drawStack = 0;
         this.stackType = null;
+        this.rematchCancelled = false;
         this.clearTurnTimer();
         this.init(this.players);
         logger.info('Game Restarted');
@@ -427,12 +429,8 @@ class UnoGame {
             if (status.id) player.id = status.id; // Update socket ID on reconnect
             logger.info(`Sync: Player ${player.name} connected=${player.connected}`);
 
-            // If everyone is now ready to rematch because someone disconnected...
             if (this.gameStatus === 'ENDED') {
-                const activePlayers = this.players.filter(p => p.connected);
-                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
-                    this.restartGame(0, true);
-                }
+                this.checkRematchDecided();
             }
         }
     }
@@ -464,6 +462,7 @@ class UnoGame {
                 isUno: p.isUno,
                 hasDrawn: p.hasDrawn,
                 wantsRematch: p.wantsRematch,
+                declinedRematch: p.declinedRematch,
                 connected: p.connected,
                 isTurn: this.players[this.turnIndex] ? this.players[this.turnIndex].userId === p.userId : false
             })),
@@ -481,6 +480,7 @@ class UnoGame {
             drawStack: this.drawStack,
             stackType: this.stackType,
             lastSkip: this.lastSkip,
+            rematchCancelled: this.rematchCancelled,
             // Turn timer info for client synchronization (primitives only, no timer object)
             turnStartTime: this.turnStartTime,
             turnDuration: this.turnDuration,
@@ -497,6 +497,10 @@ class UnoGame {
 
         const player = this.players[playerIndex];
         logger.info(`Removing player ${player.name} from UNO game`);
+
+        if (this.gameStatus === 'ENDED') {
+            this.checkRematchDecided();
+        }
 
         // Discard their hand
         if (player.hand && player.hand.length > 0) {
@@ -544,6 +548,26 @@ class UnoGame {
         }
 
         return false; // Game continues
+    }
+
+    checkRematchDecided() {
+        if (this.gameStatus !== 'ENDED') return;
+
+        const activePlayers = this.players.filter(p => p.connected);
+        if (activePlayers.length === 0) return;
+
+        const allDecided = activePlayers.every(p => p.wantsRematch || p.declinedRematch);
+        if (allDecided) {
+            const anyDeclined = activePlayers.some(p => p.declinedRematch);
+            if (anyDeclined) {
+                this.rematchCancelled = true;
+                this.emitStateChange();
+            } else {
+                this.restartGame(0);
+            }
+        } else {
+            this.emitStateChange();
+        }
     }
 
     emitStateChange() {
