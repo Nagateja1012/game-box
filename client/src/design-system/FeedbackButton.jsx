@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Button from './Button';
 import SanitizedInput, { VALIDATION_TYPES } from './SanitizedInput';
+import { URL } from '../socket.js';
 
 export default function FeedbackButton({ me }) {
     const [isOpen, setIsOpen] = useState(false);
@@ -17,7 +18,7 @@ export default function FeedbackButton({ me }) {
         setStatus(null);
 
         try {
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001/api/feedback`, {
+            const response = await fetch(`${URL}/api/feedback`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
