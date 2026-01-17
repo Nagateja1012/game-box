@@ -163,6 +163,14 @@ export default function Uno({ room, me }) {
         sendGameAction({ type: 'UNO_SHOUT' });
     };
 
+    const handleDeclineReplay = () => {
+        const nonce = Math.random().toString(36).substring(2, 15);
+        socket.emit('game_action', {
+            roomId: room.id,
+            action: { type: 'DECLINE_PLAY_AGAIN', nonce }
+        });
+    };
+
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
 
     // Game Over Overlay
@@ -177,7 +185,9 @@ export default function Uno({ room, me }) {
                 onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
                 onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
                 onClose={() => socket.emit('stop_game', { roomId: room.id })}
-                onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+                onLeave={() => {
+                    handleDeclineReplay();
+                }}
                 meUserId={me.userId}
                 title="UNO WINNER!"
                 scoreLabel="POINTS"

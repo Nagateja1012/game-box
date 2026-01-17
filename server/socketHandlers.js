@@ -14,6 +14,11 @@ function init(io) {
         logger.info(`Room ${roomId} closed: ${reason}`);
         io.to(roomId).emit('room_closed', { reason });
     });
+
+    roomManager.on('room_error', (roomId, message) => {
+        logger.info(`Broadcasting error to room ${roomId}: ${message}`);
+        io.to(roomId).emit('error', message);
+    });
 }
 
 function setupSocketHandlers(io, socket) {

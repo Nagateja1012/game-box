@@ -14,6 +14,7 @@ class UndercoverGame {
         this.votes = {}; // voterUserId -> votedUserId
         this.eliminatedUsers = new Set();
         this.winner = null;
+        this.rematchCancelled = false;
 
         this.currentWordPair = null;
         this.civilianWord = '';
@@ -21,7 +22,7 @@ class UndercoverGame {
         this.usedWordIds = new Set();
 
         this.clueDuration = 32000; // 22 seconds (2s buffer for UI)
-        this.voteDuration = 62000; // 42 seconds (2s buffer for UI)
+        this.voteDuration = 47000; // 45 seconds (2s buffer for UI)
         this.timer = null;
         this.timerStartTime = null;
         this.messages = [];
@@ -68,7 +69,8 @@ class UndercoverGame {
             word: '',
             connected: true,
             isEliminated: false,
-            wantsRematch: false
+            wantsRematch: false,
+            declinedRematch: false
         }));
 
         this.maxRounds = Math.floor(this.players.length / 2);
@@ -243,7 +245,10 @@ class UndercoverGame {
 
     handleAction(action, player) {
         // Special case for rematch actions when game is ENDED
-        if (this.gameStatus !== 'PLAYING' && action.type !== 'VOTE_PLAY_AGAIN' && action.type !== 'RESTART_GAME') return false;
+        if (this.gameStatus !== 'PLAYING' &&
+            action.type !== 'VOTE_PLAY_AGAIN' &&
+            action.type !== 'DECLINE_PLAY_AGAIN' &&
+            action.type !== 'RESTART_GAME') return false;
 
         const p = this.players.find(p => p.userId === player.userId);
         if (!p) return false;
@@ -269,29 +274,24 @@ class UndercoverGame {
 
             case 'CAST_VOTE':
                 if (this.phase !== 'VOTE') return false;
-                if (this.votes[player.userId]) return false;
-
                 const target = this.players.find(p => p.userId === action.targetUserId);
                 if (!target || target.isEliminated || target.userId === player.userId) return false;
 
-                this.votes[player.userId] = action.targetUserId;
-
-                // If everyone voted, advance immediately
-                const aliveCount = this.players.filter(p => !p.isEliminated).length;
-                if (Object.keys(this.votes).length === aliveCount) {
-                    this.clearTimer();
-                    this.processVotes();
+                if (this.votes[player.userId] === action.targetUserId) {
+                    delete this.votes[player.userId];
+                } else {
+                    this.votes[player.userId] = action.targetUserId;
                 }
-
                 return true;
 
             case 'VOTE_PLAY_AGAIN':
                 p.wantsRematch = true;
-                // Check if all CONNECTED players want rematch
-                const activePlayers = this.players.filter(p => p.connected);
-                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
-                    this.restartGame();
-                }
+                this.checkRematchDecided();
+                this.emitStateChange();
+                return true;
+            case 'DECLINE_PLAY_AGAIN':
+                p.declinedRematch = true;
+                this.checkRematchDecided();
                 this.emitStateChange();
                 return true;
 
@@ -331,6 +331,23 @@ class UndercoverGame {
         this.timerStartTime = null;
     }
 
+    checkRematchDecided() {
+        if (this.gameStatus !== 'ENDED') return;
+
+        const activePlayers = this.players.filter(p => p.connected);
+        if (activePlayers.length === 0) return;
+
+        const allDecided = activePlayers.every(p => p.wantsRematch || p.declinedRematch);
+        if (allDecided) {
+            const anyDeclined = activePlayers.some(p => p.declinedRematch);
+            if (anyDeclined) {
+                this.rematchCancelled = true;
+            } else {
+                this.restartGame();
+            }
+        }
+    }
+
     getState() {
         return {
             gameStatus: this.gameStatus,
@@ -342,6 +359,7 @@ class UndercoverGame {
             votes: this.votes,
             messages: this.messages,
             winner: this.winner,
+            rematchCancelled: this.rematchCancelled,
             timerStartTime: this.timerStartTime,
             timerDuration: this.phase === 'READ_CLUES' ? 5000 : (this.phase === 'CLUE' ? this.clueDuration : this.voteDuration),
             players: this.players.map(p => ({
@@ -353,6 +371,7 @@ class UndercoverGame {
                 word: p.word,
                 role: p.role,
                 wantsRematch: p.wantsRematch,
+                declinedRematch: p.declinedRematch,
                 isTurn: this.phase === 'CLUE' && this.players[this.turnIndex]?.userId === p.userId
             }))
         };
@@ -364,6 +383,10 @@ class UndercoverGame {
 
         const player = this.players[playerIndex];
         player.isEliminated = true; // Treat left players as eliminated
+
+        if (this.gameStatus === 'ENDED') {
+            this.checkRematchDecided();
+        }
 
         if (this.phase === 'CLUE' && this.turnIndex === playerIndex) {
             this.advanceClueTurn();
@@ -385,11 +408,13 @@ class UndercoverGame {
         this.eliminatedUsers = new Set();
         this.usedWordIds = new Set();
         this.winner = null;
+        this.rematchCancelled = false;
 
         // Reset player states but keep connection status
         this.players.forEach(p => {
             p.isEliminated = false;
             p.wantsRematch = false;
+            p.declinedRematch = false;
             p.role = 'CIVILIAN';
             p.word = '';
         });
@@ -406,6 +431,11 @@ class UndercoverGame {
         if (player) {
             player.connected = status.connected;
             if (status.id) player.id = status.id;
+
+            if (this.gameStatus === 'ENDED') {
+                this.checkRematchDecided();
+                this.emitStateChange();
+            }
         }
     }
 

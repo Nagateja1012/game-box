@@ -16,7 +16,8 @@ class BingoGame {
             lastCallTime: 0,
             winner: null,
             gridSize: 5,
-            winningPatterns: []
+            winningPatterns: [],
+            rematchCancelled: false
         };
         this.onStateChange = null;
         this.onNotification = null;
@@ -36,6 +37,7 @@ class BingoGame {
             isReady: false,
             score: 0,
             wantsRematch: false,
+            declinedRematch: false,
             connected: true
         }));
 
@@ -172,12 +174,12 @@ class BingoGame {
 
             case 'VOTE_PLAY_AGAIN':
                 gamePlayer.wantsRematch = true;
-                // Check if all CONNECTED players want rematch
-                const activePlayers = this.players.filter(p => p.connected);
-                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
-                    this.restartGame(playerIndex, true);
-                }
-                this.emitStateChange();
+                this.checkRematchDecided();
+                return true;
+
+            case 'DECLINE_PLAY_AGAIN':
+                gamePlayer.declinedRematch = true;
+                this.checkRematchDecided();
                 return true;
 
             case 'RESTART_GAME':
@@ -371,6 +373,10 @@ class BingoGame {
             return true;
         }
 
+        if (this.gameState.status === 'ENDED') {
+            this.checkRematchDecided();
+        }
+
         this.emitStateChange();
         return false;
     }
@@ -393,9 +399,30 @@ class BingoGame {
                 grid: p.grid,
                 markedCells: p.markedCells,
                 wantsRematch: p.wantsRematch,
+                declinedRematch: p.declinedRematch,
                 connected: p.connected
             }))
         };
+    }
+
+    checkRematchDecided() {
+        if (this.gameState.status !== 'ENDED') return;
+
+        const activePlayers = this.players.filter(p => p.connected);
+        if (activePlayers.length === 0) return;
+
+        const allDecided = activePlayers.every(p => p.wantsRematch || p.declinedRematch);
+        if (allDecided) {
+            const anyDeclined = activePlayers.some(p => p.declinedRematch);
+            if (anyDeclined) {
+                this.gameState.rematchCancelled = true;
+                this.emitStateChange();
+            } else {
+                this.restartGame(0);
+            }
+        } else {
+            this.emitStateChange();
+        }
     }
 
     emitStateChange() {
@@ -417,7 +444,8 @@ class BingoGame {
             lastCalledNumber: null,
             winner: null,
             gridSize: 5,
-            winningPatterns: []
+            winningPatterns: [],
+            rematchCancelled: false
         };
 
         // Re-init with current players
@@ -432,12 +460,8 @@ class BingoGame {
             player.connected = status.connected;
             if (status.id) player.id = status.id;
 
-            // Unanimous rematch check on disconnect
             if (this.gameState.status === 'ENDED') {
-                const activePlayers = this.players.filter(p => p.connected);
-                if (activePlayers.length > 0 && activePlayers.every(p => p.wantsRematch)) {
-                    this.restartGame(0, true);
-                }
+                this.checkRematchDecided();
             }
             this.emitStateChange();
         }

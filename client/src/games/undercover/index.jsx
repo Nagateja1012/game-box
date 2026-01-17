@@ -9,12 +9,14 @@ import GameWrapper from '../../screens/GameWrapper';
 import PopNotification from '../../design-system/PopNotification';
 import TurnIndicator from '../../design-system/TurnIndicator';
 import PlayerAvatar from '../../design-system/PlayerAvatar';
+import TurnTimer from '../../design-system/TurnTimer';
 
 export default function Undercover({ room, me }) {
     const { gameState } = room;
     const [clueInput, setClueInput] = useState('');
     const [showVoteModal, setShowVoteModal] = useState(false);
     const [votedUserId, setVotedUserId] = useState(null);
+    const [timeLeft, setTimeLeft] = useState(0);
     const [showInvalidClue, setShowInvalidClue] = useState(false);
     const [messageInput, setMessageInput] = useState('');
     const [isVoteDelay, setIsVoteDelay] = useState(false);
@@ -55,6 +57,21 @@ export default function Undercover({ room, me }) {
         prevGameStatus.current = gameState.gameStatus;
     }, [gameState.phase, gameState.gameStatus]);
 
+    useEffect(() => {
+        if (gameState.phase === 'VOTE' && gameState.timerStartTime) {
+            const updateTime = () => {
+                const now = Date.now();
+                const totalTarget = gameState.timerStartTime + gameState.timerDuration;
+                const remaining = Math.max(0, Math.ceil((totalTarget - now) / 1000));
+                setTimeLeft(remaining);
+            };
+
+            updateTime(); // Initial call
+            const interval = setInterval(updateTime, 1000);
+            return () => clearInterval(interval);
+        }
+    }, [gameState.phase, gameState.timerStartTime, gameState.timerDuration]);
+
     if (!gameState || !gameState.players) {
         return <div className="loading-container">Loading game state...</div>;
     }
@@ -65,7 +82,7 @@ export default function Undercover({ room, me }) {
     };
 
     const isMyTurn = gameState.players[gameState.turnIndex]?.userId === me.userId;
-    const canVote = gameState.phase === 'VOTE' && !mePlayer?.isEliminated && !votedUserId;
+    const canVote = gameState.phase === 'VOTE' && !mePlayer?.isEliminated;
 
     const sendGameAction = (action) => {
         const nonce = Math.random().toString(36).substring(2, 15);
@@ -92,7 +109,7 @@ export default function Undercover({ room, me }) {
 
     const handleVote = (targetUserId) => {
         if (!canVote) return;
-        setVotedUserId(targetUserId);
+        setVotedUserId(prev => prev === targetUserId ? null : targetUserId);
         sendGameAction({ type: 'CAST_VOTE', targetUserId });
         soundManager.playClick();
     };
@@ -102,6 +119,10 @@ export default function Undercover({ room, me }) {
         sendGameAction({ type: 'SEND_MESSAGE', text: messageInput });
         setMessageInput('');
         soundManager.playClick();
+    };
+
+    const handleDeclineReplay = () => {
+        sendGameAction({ type: 'DECLINE_PLAY_AGAIN' });
     };
 
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
@@ -117,7 +138,9 @@ export default function Undercover({ room, me }) {
                 isHost={room.players.find(p => p.id === me.id)?.isHost}
                 onVote={handleVoteReplay}
                 onClose={() => socket.emit('stop_game', { roomId: room.id })}
-                onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+                onLeave={() => {
+                    handleDeclineReplay();
+                }}
                 title={gameState.winner?.title || "GAME OVER"}
                 scoreLabel="NONE"
             />
@@ -162,7 +185,7 @@ export default function Undercover({ room, me }) {
                                     isMyTurn && !mePlayer?.isEliminated ? (
                                         <div className="center-clue-input">
                                             <div className="center-word-display">
-                                                <div className="round-info">Round {gameState.round} / 3 • <span className={mePlayer?.role === 'UNDERCOVER' ? 'undercover-danger' : ''}>{mePlayer?.role === 'CIVILIAN' ? 'CIVILIAN' : 'UNDERCOVER'}</span></div>
+                                                <div className="round-info">Round {gameState.round} / {gameState.maxRounds} • <span className={mePlayer?.role === 'UNDERCOVER' ? 'undercover-danger' : ''}>{mePlayer?.role === 'CIVILIAN' ? 'CIVILIAN' : 'UNDERCOVER'}</span></div>
                                                 WORD: <span className="word-highlight">{mePlayer.word}</span>
                                             </div>
                                             <div className="clue-input-wrapper">
@@ -182,7 +205,7 @@ export default function Undercover({ room, me }) {
                                         </div>
                                     ) : (!mePlayer?.isEliminated && (
                                         <div className="center-word-display stationary">
-                                            <div className="round-info">Round {gameState.round} / 3 • <span className={mePlayer?.role === 'UNDERCOVER' ? 'undercover-danger' : ''}>{mePlayer?.role === 'CIVILIAN' ? 'CIVILIAN' : 'UNDERCOVER'}</span></div>
+                                            <div className="round-info">Round {gameState.round} / {gameState.maxRounds} • <span className={mePlayer?.role === 'UNDERCOVER' ? 'undercover-danger' : ''}>{mePlayer?.role === 'CIVILIAN' ? 'CIVILIAN' : 'UNDERCOVER'}</span></div>
                                             YOUR WORD: <span className="word-highlight">{mePlayer.word}</span>
                                         </div>
                                     ))
@@ -215,7 +238,12 @@ export default function Undercover({ room, me }) {
                         <div className="vote-overlay" onClick={() => setShowVoteModal(false)}>
                             <div className="among-us-modal" onClick={e => e.stopPropagation()}>
                                 <div className="modal-header">
-                                    <div className="phase-title">WHO IS THE SPY?</div>
+                                    <div className="modal-header-left">
+                                        <div className="phase-title">WHO IS THE SPY?</div>
+                                        <div className="voting-timer-wrapper">
+                                            <span className="digital-countdown">{timeLeft}s</span>
+                                        </div>
+                                    </div>
                                     <button className="close-modal" onClick={() => setShowVoteModal(false)}>×</button>
                                 </div>
 

@@ -492,6 +492,14 @@ export default function Bingo({ room, me }) {
         </div>
     ) : null;
 
+    const handleDeclineReplay = () => {
+        const nonce = Math.random().toString(36).substring(2, 15);
+        socket.emit('game_action', {
+            roomId: room.id,
+            action: { type: 'DECLINE_PLAY_AGAIN', nonce }
+        });
+    };
+
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
         const bingoScores = (gameState.players || []).reduce((acc, p) => {
@@ -512,7 +520,9 @@ export default function Bingo({ room, me }) {
             onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
             onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
             onClose={() => socket.emit('stop_game', { roomId: room.id })}
-            onLeave={() => socket.emit('leave_game', { roomId: room.id, userId: me.userId })}
+            onLeave={() => {
+                handleDeclineReplay();
+            }}
             meUserId={me.userId}
             title="BINGO WINNER!"
             scoreLabel="LETTERS CLAIMED"

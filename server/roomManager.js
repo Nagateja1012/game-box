@@ -298,16 +298,9 @@ class RoomManager extends EventEmitter {
         const player = room.players.find(p => p.id === hostId);
         if (!player || !player.isHost) return { error: 'Only host can stop game' };
 
-        room.game = null;
-        room.gameState = null;
-        room.status = 'LOBBY';
-        room.players.forEach(p => {
-            p.status = 'WAITING';
-            p.votedGameId = null; // Clear votes when returning to lobby
-        });
         logger.info(`Game stopped in room ${roomId} by host`);
+        this._terminateGame(cleanRoomId, room);
 
-        this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
     }
 
@@ -326,6 +319,20 @@ class RoomManager extends EventEmitter {
             // Remove from active game logic
             if (room.game.removePlayer) {
                 const gameEnded = room.game.removePlayer(player.id);
+
+                // If rematch was in progress but now cancelled
+                if (room.game.getState().rematchCancelled && !room.isTerminating) {
+                    room.isTerminating = true;
+                    this.emit('room_updated', cleanRoomId, this.getSerializableRoom(room));
+                    this.emit('room_error', cleanRoomId, 'Not enough votes to play again. Returning to lobby in 3s...');
+
+                    room.terminationTimeout = setTimeout(() => {
+                        this._terminateGame(cleanRoomId, room, 'Rematch cancelled: A player left the game.');
+                    }, 3000);
+
+                    return { room: this.getSerializableRoom(room) };
+                }
+
                 if (gameEnded) {
                     // Game is naturally over (e.g. 1 player remains)
                     // We keep room.status as 'PLAYING' so others can see the winner overlay.
@@ -338,6 +345,29 @@ class RoomManager extends EventEmitter {
 
         this.updateActivity(roomId);
         return { room: this.getSerializableRoom(room) };
+    }
+
+    _terminateGame(roomId, room, message) {
+        if (room.terminationTimeout) {
+            clearTimeout(room.terminationTimeout);
+            room.terminationTimeout = null;
+        }
+        if (room.game && room.game.stop) {
+            room.game.stop();
+        }
+        room.isTerminating = false; // Reset termination flag
+        room.game = null;
+        room.gameState = null;
+        room.status = 'LOBBY';
+        room.players.forEach(p => {
+            p.status = 'WAITING';
+            p.votedGameId = null;
+        });
+        logger.info(`Game terminated in room ${roomId}. Reason: ${message || 'Unknown'}`);
+        this.emit('room_updated', roomId, this.getSerializableRoom(room));
+        if (message) {
+            this.emit('room_error', roomId, message);
+        }
     }
 
     handleGameAction(roomId, playerId, action) {
@@ -368,6 +398,21 @@ class RoomManager extends EventEmitter {
             const changed = room.game.handleAction(action, player);
             if (changed) {
                 room.gameState = room.game.getState();
+
+                // Check for rematch cancellation
+                if (room.gameState.rematchCancelled && !room.isTerminating) {
+                    room.isTerminating = true;
+                    // Broadcast updated state first so everyone sees the 'X' marks
+                    this.emit('room_updated', cleanRoomId, this.getSerializableRoom(room));
+                    this.emit('room_error', cleanRoomId, 'Not enough votes to play again. Returning to lobby in 3s...');
+
+                    room.terminationTimeout = setTimeout(() => {
+                        this._terminateGame(cleanRoomId, room, 'Rematch cancelled: A player declined.');
+                    }, 3000);
+
+                    return { room: this.getSerializableRoom(room) };
+                }
+
                 this.updateActivity(roomId);
                 return { room: this.getSerializableRoom(room) };
             }
