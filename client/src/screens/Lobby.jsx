@@ -42,10 +42,16 @@ export default function Lobby({ room, me }) {
         return true;
     };
 
-    const handleStartGame = (gameId) => {
-        if (!isHost) return;
-        if (checkStartEligibility(gameId)) {
-            socket.emit('start_game', { roomId: room.id, gameId });
+    const handleGameClick = (gameId) => {
+        // Everyone can vote
+        socket.emit('vote_game', { roomId: room.id, gameId });
+        soundManager.playClick();
+
+        // Only host can start
+        if (isHost) {
+            if (checkStartEligibility(gameId)) {
+                socket.emit('start_game', { roomId: room.id, gameId });
+            }
         }
     };
 
@@ -237,14 +243,14 @@ export default function Lobby({ room, me }) {
                                     <div
                                         key={id}
                                         className={`game-card ${isComingSoon ? 'coming-soon' : ''}`}
-                                        onClick={() => !isComingSoon && handleStartGame(id)}
+                                        onClick={() => !isComingSoon && handleGameClick(id)}
                                         onMouseEnter={() => !isComingSoon && setHoveredGameId(id)}
                                         onMouseLeave={() => setHoveredGameId(null)}
-                                        title={!isComingSoon && !isHost ? "Host will select the game" : ""}
+                                        title={!isComingSoon && !isHost ? "Click to vote for this game" : ""}
                                         style={{
                                             cursor: isComingSoon ? 'not-allowed' : 'pointer',
                                             opacity: isComingSoon ? 0.7 : 1,
-                                            border: isHovered ? '2px solid #06b6d4' : '1px solid rgba(255,255,255,0.08)',
+                                            border: isHovered || room.players.some(p => p.votedGameId === id && p.userId === me.userId) ? '2px solid #06b6d4' : '1px solid rgba(255,255,255,0.08)',
                                             transform: isHovered ? 'translateY(-8px) scale(1.02)' : 'translateY(0) scale(1)',
                                             boxShadow: isHovered ? '0 10px 25px rgba(0,0,0,0.5), 0 0 15px rgba(6,182,212,0.2)' : 'none',
                                             position: 'relative',
@@ -254,6 +260,40 @@ export default function Lobby({ room, me }) {
                                             transition: 'all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                                         }}
                                     >
+                                        {/* Vote Bubbles */}
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: '10px',
+                                            left: '10px',
+                                            display: 'flex',
+                                            gap: '-8px',
+                                            zIndex: 10
+                                        }}>
+                                            {room.players.filter(p => p.votedGameId === id).map((p, idx) => (
+                                                <div
+                                                    key={p.userId}
+                                                    title={`${p.name} wants to play this`}
+                                                    style={{
+                                                        width: '24px',
+                                                        height: '24px',
+                                                        borderRadius: '50%',
+                                                        background: p.userId === me.userId ? '#06b6d4' : '#1e293b',
+                                                        border: '2px solid #0f172a',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: '0.6rem',
+                                                        fontWeight: 'bold',
+                                                        color: '#fff',
+                                                        marginLeft: idx > 0 ? '-8px' : '0',
+                                                        boxShadow: '0 2px 5px rgba(0,0,0,0.3)',
+                                                        zIndex: 20 - idx
+                                                    }}
+                                                >
+                                                    {p.name.charAt(0).toUpperCase()}
+                                                </div>
+                                            ))}
+                                        </div>
                                         <div className="game-image" style={{ backgroundImage: `url(${meta.image})` }}>
                                             {isComingSoon && (
                                                 <div style={{
@@ -349,10 +389,14 @@ export default function Lobby({ room, me }) {
             )}
 
             <RulesOverlay
-                isOpen={!!rulesGameId}
+                isOpen={!!rulesGameId || room.status === 'STARTING'}
                 onClose={() => setRulesGameId(null)}
-                gameName={rulesGameId ? GAME_METADATA[rulesGameId]?.name : ''}
-                rules={rulesGameId ? GAME_METADATA[rulesGameId]?.rules : ''}
+                gameName={(rulesGameId ? GAME_METADATA[rulesGameId]?.name : (room.game?.id ? GAME_METADATA[room.game.id]?.name : '')) || ''}
+                rules={(rulesGameId ? GAME_METADATA[rulesGameId]?.rules : (room.game?.id ? GAME_METADATA[room.game.id]?.rules : '')) || ''}
+                isMandatory={room.status === 'STARTING'}
+                players={room.players}
+                me={me}
+                roomId={room.id}
             />
         </div>
     );

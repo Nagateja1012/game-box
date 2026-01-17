@@ -73,6 +73,42 @@ function setupSocketHandlers(io, socket) {
         }
     });
 
+    // Ready Game (Mandatory Rules)
+    socket.on('ready_game', ({ roomId, userId }) => {
+        try {
+            const cleanRoomId = sanitize(roomId, { maxLength: 6, allowedType: VALIDATION_TYPES.ALPHANUMERIC }).toUpperCase();
+            logger.info(`Player ${userId} readied up in room ${cleanRoomId}`);
+            const result = roomManager.readyPlayer(cleanRoomId, userId);
+            if (result.error) {
+                socket.emit('error', result.error);
+            } else {
+                io.to(cleanRoomId).emit('room_updated', result.room);
+            }
+        } catch (error) {
+            logger.error(`Error in ready_game`, error);
+            socket.emit('error', 'Internal server error during ready check');
+        }
+    });
+
+    // Vote for Game
+    socket.on('vote_game', ({ roomId, gameId }) => {
+        try {
+            const cleanRoomId = sanitize(roomId, { maxLength: 6, allowedType: VALIDATION_TYPES.ALPHANUMERIC }).toUpperCase();
+            // Get userId from the socket or from the room's players list mapping
+            const room = roomManager.getRoom(cleanRoomId);
+            if (!room) return;
+            const player = room.players.find(p => p.id === socket.id);
+            if (!player) return;
+
+            const result = roomManager.voteGame(cleanRoomId, player.userId, gameId);
+            if (result.room) {
+                io.to(cleanRoomId).emit('room_updated', result.room);
+            }
+        } catch (error) {
+            logger.error(`Error in vote_game`, error);
+        }
+    });
+
     // Game Action
     socket.on('game_action', ({ roomId, action }) => {
         try {

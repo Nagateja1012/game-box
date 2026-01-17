@@ -84,6 +84,7 @@ class RoomManager extends EventEmitter {
                 userId,
                 connected: true,
                 status: 'WAITING',
+                votedGameId: null,
                 lastHeartbeat: Date.now()
             }],
             gameState: null,
@@ -155,7 +156,8 @@ class RoomManager extends EventEmitter {
                 isHost: false,
                 userId,
                 connected: true,
-                status: 'WAITING',
+                status: room.status === 'STARTING' ? 'READING' : 'WAITING',
+                votedGameId: null,
                 lastHeartbeat: Date.now()
             });
             logger.info(`Player ${cleanPlayerName} (${playerId}) joined room ${roomId}`);
@@ -177,7 +179,7 @@ class RoomManager extends EventEmitter {
             players: room.players,
             gameState: room.gameState,
             status: room.status,
-            game: room.game ? { id: room.game.id } : null
+            game: room.game ? { id: room.game.id } : (room.pendingGameId ? { id: room.pendingGameId } : null)
         };
     }
 
@@ -186,8 +188,74 @@ class RoomManager extends EventEmitter {
         const room = this.rooms.get(cleanRoomId);
         if (!room) return { error: 'Room not found' };
 
+        if (!GAME_REGISTRY[gameId]) return { error: `${gameId} not found` };
+
+        try {
+            // Enter STARTING phase where players must read rules
+            room.status = 'STARTING';
+            room.pendingGameId = gameId;
+
+            // Reset player status to READING
+            room.players.forEach(p => {
+                p.status = 'READING';
+            });
+
+            logger.info(`Game ${gameId} entering STARTING phase in room ${roomId}`);
+            this.emit('room_updated', roomId, this.getSerializableRoom(room));
+        } catch (error) {
+            logger.error(`Error entering STARTING phase for ${gameId} in room ${roomId}`, error);
+            return { error: 'Failed to initiate game start' };
+        }
+
+        this.updateActivity(roomId);
+        return { room: this.getSerializableRoom(room) };
+    }
+
+    readyPlayer(roomId, userId) {
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
+        if (!room || room.status !== 'STARTING') return { error: 'Invalid room state' };
+
+        const player = room.players.find(p => p.userId === userId);
+        if (!player) return { error: 'Player not found' };
+
+        player.status = 'READY';
+        logger.info(`Player ${player.name} is READY in room ${roomId}`);
+
+        // Check if all players are READY
+        const allReady = room.players.every(p => p.status === 'READY');
+
+        if (allReady) {
+            this.finalizeStartGame(roomId);
+        } else {
+            this.emit('room_updated', roomId, this.getSerializableRoom(room));
+        }
+
+        return { room: this.getSerializableRoom(room) };
+    }
+
+    voteGame(roomId, userId, gameId) {
+        const cleanRoomId = this._sanitizeRoomId(roomId);
+        const room = this.rooms.get(cleanRoomId);
+        if (!room) return { error: 'Room not found' };
+
+        const player = room.players.find(p => p.userId === userId);
+        if (!player) return { error: 'Player not found' };
+
+        // Toggle vote if clicking same game, or update to new one
+        player.votedGameId = player.votedGameId === gameId ? null : gameId;
+
+        logger.info(`Player ${player.name} voted for ${gameId || 'nothing'} in room ${roomId}`);
+        this.emit('room_updated', roomId, this.getSerializableRoom(room));
+        return { room: this.getSerializableRoom(room) };
+    }
+
+    finalizeStartGame(roomId) {
+        const room = this.rooms.get(roomId);
+        if (!room || !room.pendingGameId) return;
+
+        const gameId = room.pendingGameId;
         const GameClass = GAME_REGISTRY[gameId];
-        if (!GameClass) return { error: `${gameId} not found` };
 
         try {
             // Shuffle players for universal random turn order and display
@@ -197,9 +265,13 @@ class RoomManager extends EventEmitter {
             if (room.game.init) {
                 room.game.init(room.players, roomId);
             }
-            room.players.forEach(p => p.status = 'PLAYING');
+            room.players.forEach(p => {
+                p.status = 'PLAYING';
+                p.votedGameId = null; // Clear votes on game start
+            });
             room.gameState = room.game.getState();
             room.status = 'PLAYING';
+            room.pendingGameId = null;
 
             // Set state change callback
             room.game.onStateChange = () => {
@@ -207,14 +279,15 @@ class RoomManager extends EventEmitter {
                 this.emit('room_updated', roomId, this.getSerializableRoom(room));
             };
 
-            logger.info(`Game ${gameId} started in room ${roomId}`);
+            this.emit('room_updated', roomId, this.getSerializableRoom(room));
+            logger.info(`Game ${gameId} finalized start in room ${roomId}`);
         } catch (error) {
-            logger.error(`Error initializing game ${gameId} in room ${roomId}`, error);
-            return { error: 'Failed to start game' };
+            logger.error(`Error finalizing game ${gameId} in room ${roomId}`, error);
+            room.status = 'LOBBY';
+            room.pendingGameId = null;
+            room.players.forEach(p => p.status = 'WAITING');
+            this.emit('room_updated', roomId, this.getSerializableRoom(room));
         }
-
-        this.updateActivity(roomId);
-        return { room: this.getSerializableRoom(room) };
     }
 
     stopGame(roomId, hostId) {
@@ -228,7 +301,10 @@ class RoomManager extends EventEmitter {
         room.game = null;
         room.gameState = null;
         room.status = 'LOBBY';
-        room.players.forEach(p => p.status = 'WAITING');
+        room.players.forEach(p => {
+            p.status = 'WAITING';
+            p.votedGameId = null; // Clear votes when returning to lobby
+        });
         logger.info(`Game stopped in room ${roomId} by host`);
 
         this.updateActivity(roomId);

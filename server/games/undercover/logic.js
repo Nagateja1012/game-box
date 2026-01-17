@@ -18,9 +18,10 @@ class UndercoverGame {
         this.currentWordPair = null;
         this.civilianWord = '';
         this.undercoverWord = '';
+        this.usedWordIds = new Set();
 
-        this.clueDuration = 22000; // 22 seconds (2s buffer for UI)
-        this.voteDuration = 42000; // 42 seconds (2s buffer for UI)
+        this.clueDuration = 32000; // 22 seconds (2s buffer for UI)
+        this.voteDuration = 62000; // 42 seconds (2s buffer for UI)
         this.timer = null;
         this.timerStartTime = null;
         this.messages = [];
@@ -70,14 +71,22 @@ class UndercoverGame {
             wantsRematch: false
         }));
 
+        this.maxRounds = Math.floor(this.players.length / 2);
         this.assignRolesAndWords();
         this.gameStatus = 'PLAYING';
         this.startCluePhase();
     }
 
     assignRolesAndWords() {
-        // Choose word pair using seeded random
-        const wordPair = WORD_PAIRS[Math.floor(this.random() * WORD_PAIRS.length)];
+        // Choose word pair using seeded random, avoiding repeats in next rounds
+        let availablePairs = WORD_PAIRS.filter(p => !this.usedWordIds.has(p.id));
+        if (availablePairs.length === 0) {
+            this.usedWordIds.clear();
+            availablePairs = WORD_PAIRS;
+        }
+
+        const wordPair = availablePairs[Math.floor(this.random() * availablePairs.length)];
+        this.usedWordIds.add(wordPair.id);
 
         this.civilianWord = wordPair.civilian;
         this.undercoverWord = wordPair.undercover;
@@ -374,6 +383,7 @@ class UndercoverGame {
         this.votes = {};
         this.messages = [];
         this.eliminatedUsers = new Set();
+        this.usedWordIds = new Set();
         this.winner = null;
 
         // Reset player states but keep connection status

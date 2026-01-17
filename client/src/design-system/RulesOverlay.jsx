@@ -1,9 +1,18 @@
 import React from 'react';
 import Button from './Button';
 import { soundManager } from '../utils/soundManager';
+import { socket } from '../socket';
 
-export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
+export default function RulesOverlay({ isOpen, onClose, gameName, rules, isMandatory, players, me, roomId }) {
     if (!isOpen) return null;
+
+    const handleGotIt = () => {
+        if (isMandatory && roomId && me) {
+            socket.emit('ready_game', { roomId, userId: me.userId });
+        }
+        soundManager.playClick();
+        onClose();
+    };
 
     // Simple markdown-to-JSX parser for the rules
     const renderMarkdown = (text) => {
@@ -89,10 +98,7 @@ export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
                         How to Play <span style={{ color: '#06b6d4' }}>{gameName}</span>
                     </h2>
                     <button
-                        onClick={() => {
-                            soundManager.playClick();
-                            onClose();
-                        }}
+                        onClick={handleGotIt}
                         style={{
                             background: 'transparent',
                             border: 'none',
@@ -100,7 +106,8 @@ export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
                             fontSize: '1.5rem',
                             cursor: 'pointer',
                             opacity: 0.5,
-                            transition: 'opacity 0.2s'
+                            transition: 'opacity 0.2s',
+                            display: isMandatory ? 'none' : 'block'
                         }}
                         onMouseEnter={e => e.currentTarget.style.opacity = 0.8}
                         onMouseLeave={e => e.currentTarget.style.opacity = 0.5}
@@ -118,6 +125,35 @@ export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
                     color: '#ddd'
                 }}>
                     {renderMarkdown(rules)}
+
+                    {isMandatory && players && (
+                        <div style={{ marginTop: '30px', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '20px' }}>
+                            <h4 style={{ color: '#06b6d4', marginBottom: '15px', fontSize: '0.9rem' }}>PLAYERS READING RULES</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
+                                {players.map(p => (
+                                    <div key={p.userId} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        background: 'rgba(255,255,255,0.02)',
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        opacity: p.status === 'READY' ? 0.4 : 1,
+                                        border: p.status === 'READY' ? '1px solid rgba(0,255,0,0.1)' : '1px solid rgba(255,255,255,0.05)'
+                                    }}>
+                                        <div style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            borderRadius: '50%',
+                                            background: p.status === 'READY' ? '#22c55e' : '#eab308',
+                                            boxShadow: `0 0 10px ${p.status === 'READY' ? '#22c55e44' : '#eab30844'}`
+                                        }} />
+                                        <span style={{ fontSize: '0.8rem', fontWeight: '500' }}>{p.name} {p.userId === me?.userId && '(You)'}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}
@@ -128,14 +164,12 @@ export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
                     justifyContent: 'center'
                 }}>
                     <Button
-                        variant="secondary"
-                        onClick={() => {
-                            soundManager.playClick();
-                            onClose();
-                        }}
-                        style={{ width: '120px' }}
+                        variant="primary"
+                        onClick={handleGotIt}
+                        style={{ width: isMandatory ? '100%' : '120px' }}
+                        disabled={isMandatory && players.find(p => p.userId === me?.userId)?.status === 'READY'}
                     >
-                        GOT IT
+                        {isMandatory ? (players.find(p => p.userId === me?.userId)?.status === 'READY' ? 'WAITING FOR OTHERS...' : 'START GAME') : 'GOT IT'}
                     </Button>
                 </div>
 
@@ -161,6 +195,6 @@ export default function RulesOverlay({ isOpen, onClose, gameName, rules }) {
                     `}
                 </style>
             </div>
-        </div>
+        </div >
     );
 }

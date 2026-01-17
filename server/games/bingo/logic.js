@@ -22,7 +22,7 @@ class BingoGame {
         this.onNotification = null;
         this.setupTimer = null;
         this.turnTimer = null;
-        this.SETUP_DURATION = 10000;
+        this.SETUP_DURATION = 15000;
     }
 
     init(players) {
@@ -83,11 +83,11 @@ class BingoGame {
 
         // Define Phase Durations (Updated to 8s/8s per request)
         const DURATIONS = {
-            'CALLING': 8000,
-            'MARKING': 8000
+            'CALLING': 12000,
+            'MARKING': 12000
         };
 
-        const duration = DURATIONS[this.gameState.turnPhase] || 8000;
+        const duration = DURATIONS[this.gameState.turnPhase] || 12000;
 
         this.gameState.turnDuration = duration;
         this.gameState.turnStartTime = Date.now();

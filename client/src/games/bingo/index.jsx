@@ -119,13 +119,19 @@ export default function Bingo({ room, me }) {
         }
     }, [alreadySetUp, mePlayer]);
 
+    // Initialize and Sync Grid Size
     useEffect(() => {
-        if (setupMode === 'CUSTOM' && availableNumbers.length === 0 && myGrid.length === 0) {
-            const size = gridSize * gridSize;
-            setAvailableNumbers(Array.from({ length: size }, (_, i) => i + 1));
-            setMyGrid(createEmptyGrid(gridSize));
+        if (setupMode === 'CUSTOM') {
+            const expectedSize = gridSize * gridSize;
+            // If grid is empty or has wrong size, initialize/reset it
+            if (myGrid.length !== expectedSize) {
+                console.log(`BINGO: Resizing grid from ${myGrid.length} to ${expectedSize}`);
+                setAvailableNumbers(Array.from({ length: expectedSize }, (_, i) => i + 1));
+                setMyGrid(createEmptyGrid(gridSize));
+                setIsRandomMode(false); // Reset random mode if size changes
+            }
         }
-    }, [setupMode, gridSize, availableNumbers.length, myGrid.length]);
+    }, [setupMode, gridSize, myGrid.length]);
 
     // Notification Helper
     const notificationTimeoutRef = useRef(null);
