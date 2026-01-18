@@ -130,19 +130,15 @@ class SoundManager {
         if (this.muted) return;
         // Dramatic chord
         this.playChord([300, 450, 600], 'sawtooth', 0.5, 0.1);
-        this.playSpeech("Uno!", 1.2);
+        this.PlayAudio("uno")
     }
 
-    // --- Speech ---
 
-    playSpeech(text, rate = 1.0, pitch = 1.0) {
-        if (this.muted || !('speechSynthesis' in window)) return;
-
-        window.speechSynthesis.cancel(); // meaningful interruption
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = rate;
-        utterance.pitch = pitch;
-        window.speechSynthesis.speak(utterance);
+    PlayAudio(number) {
+        if (this.muted) return;
+        const numbercalled = new Audio(`../audio/${number}.m4a`);
+        numbercalled.volume = 0.8;
+        numbercalled.play();
     }
 }
 

@@ -111,6 +111,7 @@ export default function Bingo({ room, me }) {
     const mePlayer = gameState.players.find(p => p.userId === me.userId);
     const myMarkedCells = new Set(mePlayer?.markedCells || []);
     const alreadySetUp = mePlayer?.isReady;
+    const isMyTurn = gameState.players[gameState.turnIndex]?.userId === me.userId;
 
     useEffect(() => {
         if (alreadySetUp && setupMode !== 'READY') {
@@ -165,7 +166,7 @@ export default function Bingo({ room, me }) {
     useEffect(() => {
         if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !soundManager.muted) {
             // Include lastCallTime in dependency to re-trigger same number calls
-            soundManager.playSpeech(gameState.lastCalledNumber.toString(), 0.85);
+            soundManager.PlayAudio(gameState.lastCalledNumber);
         }
     }, [gameState.lastCalledNumber, gameState.lastCallTime, gameState.status]);
 
@@ -420,7 +421,6 @@ export default function Bingo({ room, me }) {
             if (isTurn) {
                 sendGameAction({ type: 'CALL_NUMBER', number: num });
                 soundManager.playClick();
-                soundManager.playSpeech(num.toString(), 0.9);
             }
         } else if (phase === 'MARKING') {
             if (num === gs.lastCalledNumber) {
@@ -468,7 +468,7 @@ export default function Bingo({ room, me }) {
     };
 
     const renderPlayers = () => {
-        const MAX_SIDE_PLAYERS = 5;
+        const MAX_SIDE_PLAYERS = 9;
         const players = gameState.players || [];
         const sidePlayers = players.slice(0, MAX_SIDE_PLAYERS);
         const bottomPlayers = players.slice(MAX_SIDE_PLAYERS);
@@ -500,6 +500,10 @@ export default function Bingo({ room, me }) {
         });
     };
 
+    const handleLeaveGame = () => {
+        socket.emit('leave_game', { roomId: room.id, userId: me.userId });
+    };
+
     let gameOverNode = null;
     if (gameState.status === 'ENDED') {
         const bingoScores = (gameState.players || []).reduce((acc, p) => {
@@ -517,11 +521,15 @@ export default function Bingo({ room, me }) {
             players={gameState.players}
             scores={bingoScores}
             isHost={isHost}
-            onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
-            onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
+            onRestart={() => handleGameAction({ type: 'RESTART_GAME' })}
+            onVote={() => handleGameAction({ type: 'VOTE_PLAY_AGAIN' })}
             onClose={() => socket.emit('stop_game', { roomId: room.id })}
             onLeave={() => {
-                handleDeclineReplay();
+                if (gameState.players.length > 1) {
+                    handleDeclineReplay();
+                }
+                soundManager.playClick();
+                handleLeaveGame();
             }}
             meUserId={me.userId}
             title="BINGO WINNER!"
@@ -547,7 +555,7 @@ export default function Bingo({ room, me }) {
                             <PlayerItem
                                 key={p.id}
                                 p={p}
-                                meId={me.id}
+                                meUserId={me.userId}
                                 roomId={room.id}
                                 turnIndex={gameState.turnIndex}
                                 players={gameState.players}
@@ -561,19 +569,23 @@ export default function Bingo({ room, me }) {
                         <div className="game-header" style={{ height: '100px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', position: 'relative' }}>
                             {gameState.status === 'PLAYING' && (
                                 <TurnIndicator
-                                    isMyTurn={gameState.players[gameState.turnIndex]?.id === me.id}
+                                    isMyTurn={isMyTurn}
                                     playerName={gameState.players[gameState.turnIndex]?.name}
                                     variant="bingo"
                                 />
                             )}
                             <div className="phase-label" style={{ fontSize: '0.8rem', opacity: 0.8, letterSpacing: '1px' }}>{getPhaseMessage()}</div>
-                            <GameHeaderTimer
-                                status={gameState.status}
-                                setupEndTime={gameState.setupEndTime}
-                                turnStartTime={gameState.turnStartTime}
-                                turnDuration={gameState.turnDuration}
-                                turnPhase={gameState.turnPhase}
-                            />
+                            {(gameState.status === 'SETUP' || gameState.turnPhase === 'MARKING' || (gameState.turnPhase === 'CALLING' && isMyTurn)) ? (
+                                <GameHeaderTimer
+                                    status={gameState.status}
+                                    setupEndTime={gameState.setupEndTime}
+                                    turnStartTime={gameState.turnStartTime}
+                                    turnDuration={gameState.turnDuration}
+                                    turnPhase={gameState.turnPhase}
+                                />
+                            ) : (
+                                <div style={{ height: '2.5rem' }} />
+                            )}
                         </div>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', width: '100%', position: 'relative', paddingTop: '10px' }}>
                             {gameState.status === 'SETUP' && setupMode === 'CUSTOM' && (
@@ -592,20 +604,22 @@ export default function Bingo({ room, me }) {
                                 })}
                             </div>
                         </div>
-                        <div className="bottom-players">
-                            {bottomPlayers.map(p => (
-                                <PlayerItem
-                                    key={p.userId}
-                                    p={p}
-                                    meUserId={me.userId}
-                                    roomId={room.id}
-                                    turnIndex={gameState.turnIndex}
-                                    players={gameState.players}
-                                    turnStartTime={gameState.turnStartTime}
-                                    turnDuration={gameState.turnDuration}
-                                />
-                            ))}
-                        </div>
+                        {bottomPlayers.length > 0 && (
+                            <div className="bottom-players">
+                                {bottomPlayers.map(p => (
+                                    <PlayerItem
+                                        key={p.userId}
+                                        p={p}
+                                        meUserId={me.userId}
+                                        roomId={room.id}
+                                        turnIndex={gameState.turnIndex}
+                                        players={gameState.players}
+                                        turnStartTime={gameState.turnStartTime}
+                                        turnDuration={gameState.turnDuration}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="right-panel">
                         <div className="current-number-display" style={{ color: gameState.turnPhase === 'MARKING' ? '#FFD700' : 'white', borderColor: gameState.turnPhase === 'MARKING' ? '#FFD700' : 'white' }}>

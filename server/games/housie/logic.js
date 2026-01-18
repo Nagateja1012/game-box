@@ -297,6 +297,30 @@ class HousieGame {
     }
 
     endGame() {
+        if (!this.gameState.winner) {
+            // Find player with highest score
+            let topScore = -1;
+            let winners = [];
+
+            this.players.forEach(p => {
+                if (p.score > topScore) {
+                    topScore = p.score;
+                    winners = [p];
+                } else if (p.score === topScore && topScore > 0) {
+                    winners.push(p);
+                }
+            });
+
+            if (topScore > 0) {
+                if (winners.length === 1) {
+                    this.gameState.winner = winners[0];
+                } else if (winners.length > 1) {
+                    // In case of tie, pick the first one
+                    this.gameState.winner = winners[0];
+                }
+            }
+        }
+
         this.gameState.status = 'ENDED';
         this.stop();
         this.emitStateChange();
@@ -310,6 +334,10 @@ class HousieGame {
     getState() {
         return {
             ...this.gameState,
+            winner: this.gameState.winner ? {
+                userId: this.gameState.winner.userId,
+                name: this.gameState.winner.name
+            } : null,
             players: this.players.map(p => ({
                 id: p.id,
                 userId: p.userId,
@@ -377,7 +405,19 @@ class HousieGame {
         const playerIndex = this.players.findIndex(p => p.id === playerId);
         if (playerIndex === -1) return false;
         this.players.splice(playerIndex, 1);
-        if (this.players.length < 1 && this.gameState.status === 'PLAYING') {
+
+        console.log(`HOUSIE: Removing player ${playerId}. ${this.players.length} left.`);
+
+        // Win condition: 1 player remains
+        // Only trigger this if we are in PLAYING or SETUP (avoid loops if already ended)
+        const activeStatus = this.gameState.status === 'PLAYING' || this.gameState.status === 'SETUP';
+        if (this.players.length === 1 && activeStatus) {
+            this.gameState.winner = this.players[0];
+            this.endGame();
+            return true;
+        }
+
+        if (this.players.length < 1 && activeStatus) {
             this.endGame();
         }
         this.emitStateChange();

@@ -16,6 +16,7 @@ export default function Uno({ room, me }) {
     const [unoPopUp, setUnoPopUp] = useState(null);
     const [showInvalidMove, setShowInvalidMove] = useState(false);
     const [skipPopUp, setSkipPopUp] = useState(null);
+    const [, setForceUpdate] = useState(0); // Add force update to trigger re-renders
 
     const lastProcessedShoutTime = React.useRef(gameState.lastUnoShout?.time || 0);
     const lastProcessedSkipTime = React.useRef(gameState.lastSkip?.timestamp || 0);
@@ -171,6 +172,11 @@ export default function Uno({ room, me }) {
         });
     };
 
+    const handleLeaveGame = () => {
+        socket.emit('leave_game', { roomId: room.id, userId: me.userId });
+        setForceUpdate(h => h + 1); // Force re-render if needed
+    };
+
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
 
     // Game Over Overlay
@@ -186,7 +192,11 @@ export default function Uno({ room, me }) {
                 onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
                 onClose={() => socket.emit('stop_game', { roomId: room.id })}
                 onLeave={() => {
-                    handleDeclineReplay();
+                    if (gameState.players.length > 1) {
+                        handleDeclineReplay();
+                    }
+                    soundManager.playClick();
+                    handleLeaveGame();
                 }}
                 meUserId={me.userId}
                 title="UNO WINNER!"
