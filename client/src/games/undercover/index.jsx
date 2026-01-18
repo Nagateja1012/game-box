@@ -125,6 +125,10 @@ export default function Undercover({ room, me }) {
         sendGameAction({ type: 'DECLINE_PLAY_AGAIN' });
     };
 
+    const handleLeaveGame = () => {
+        socket.emit('leave_game', { roomId: room.id, userId: me.userId });
+    };
+
     const isHost = room.players.find(p => p.id === me.id)?.isHost;
     const activePlayer = gameState.players[gameState.turnIndex];
 
@@ -139,10 +143,15 @@ export default function Undercover({ room, me }) {
                 onVote={handleVoteReplay}
                 onClose={() => socket.emit('stop_game', { roomId: room.id })}
                 onLeave={() => {
-                    handleDeclineReplay();
+                    if (gameState.players.length > 1) {
+                        handleDeclineReplay();
+                    }
+                    soundManager.playClick();
+                    handleLeaveGame();
                 }}
                 title={gameState.winner?.title || "GAME OVER"}
                 scoreLabel="NONE"
+                disableRematch={!!gameState.winner?.isForfeit}
             />
         );
     }

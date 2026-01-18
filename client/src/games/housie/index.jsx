@@ -25,19 +25,30 @@ const AwardStats = React.memo(({ claims, score }) => (
 ));
 
 const PlayerItem = React.memo(({ p, meUserId, roomId }) => {
-    const stats = useMemo(() => [{ icon: '', value: <AwardStats claims={p.claims || {}} score={p.score} /> }], [p.claims, p.score]);
+    const stats = useMemo(() => [{ icon: '🏆', value: p.score || 0 }], [p.score]);
     const tags = useMemo(() => p.status === 'WAITING' ? ['OFFLINE'] : [], [p.status]);
 
     return (
-        <PlayerBubble player={p} isMe={p.userId === meUserId} roomId={roomId} isTurn={false} variant="housie" stats={stats} tags={tags} />
+        <PlayerBubble player={p} isMe={p.userId === meUserId} roomId={roomId} isTurn={false} variant="bingo" stats={stats} tags={tags} />
     );
 });
 
-const GameHeaderTimer = React.memo(({ lastNum }) => {
+const GameHeaderTimer = React.memo(({ lastNum, status }) => {
+    const isStarting = !lastNum && (status === 'PLAYING' || status === 'SETUP');
     return (
         <div className="game-timer-container" style={{ position: 'relative' }}>
-            <div className="current-number-display" style={{ margin: 0 }}>
-                {lastNum || '--'}
+            <div className="current-number-display" style={{
+                margin: 0,
+                fontSize: isStarting ? '0.9rem' : '3.5rem',
+                textAlign: 'center',
+                lineHeight: isStarting ? '1.2' : 'normal',
+                padding: isStarting ? '10px' : '0',
+                borderRadius: isStarting ? '20px' : '50%',
+                width: isStarting ? 'auto' : '100px',
+                minWidth: '100px',
+                aspectRatio: isStarting ? 'auto' : '1'
+            }}>
+                {lastNum ? lastNum : (isStarting ? 'GAME STARTING...' : '--')}
             </div>
         </div>
     );
@@ -137,6 +148,10 @@ export default function Housie({ room, me }) {
         });
     };
 
+    const handleLeaveGame = () => {
+        socket.emit('leave_game', { roomId: room.id, userId: me.userId });
+    };
+
     const handleMark = (num) => {
         if (!num) return;
         if (gameState.status !== 'PLAYING') return;
@@ -204,7 +219,13 @@ export default function Housie({ room, me }) {
             onRestart={() => sendGameAction({ type: 'RESTART_GAME' })}
             onVote={() => sendGameAction({ type: 'VOTE_PLAY_AGAIN' })}
             onClose={() => socket.emit('stop_game', { roomId: room.id })}
-            onLeave={() => sendGameAction({ type: 'DECLINE_PLAY_AGAIN' })}
+            onLeave={() => {
+                if (gameState.players.length > 1) {
+                    sendGameAction({ type: 'DECLINE_PLAY_AGAIN' });
+                }
+                soundManager.playClick();
+                handleLeaveGame();
+            }}
             meUserId={me.userId}
             title="HOUSIE COMPLETED!"
             scoreLabel="TOTAL POINTS"
@@ -230,7 +251,7 @@ export default function Housie({ room, me }) {
                 <div className="housie-layout">
                     <PopNotification show={!!notification} text={notification} color="#4ade80" />
                     <div className="left-panel">
-                        {gameState.players.slice(0, 5).map(p => (
+                        {gameState.players.slice(0, 9).map(p => (
                             <PlayerItem key={p.userId} p={p} meUserId={me.userId} roomId={room.id} />
                         ))}
                     </div>
@@ -258,10 +279,18 @@ export default function Housie({ room, me }) {
                                 );
                             })}
                         </div>
+                        {gameState.players.length > 9 && (
+                            <div className="bottom-players">
+                                {gameState.players.slice(9).map(p => (
+                                    <PlayerItem key={p.userId} p={p} meUserId={me.userId} roomId={room.id} />
+                                ))}
+                            </div>
+                        )}
                     </div>
                     <div className="right-panel">
                         <GameHeaderTimer
                             lastNum={gameState.lastCalledNumber}
+                            status={gameState.status}
                         />
                         <div className="last-calls-label" style={{ opacity: 0.7, fontSize: '0.8rem', marginTop: '10px' }}>RECENTLY CALLED</div>
                         <div className="last-calls">

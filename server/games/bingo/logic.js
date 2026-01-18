@@ -365,7 +365,10 @@ class BingoGame {
         }
 
         // Win condition: 1 player remains
-        if (this.players.length < 2 && this.gameState.status === 'PLAYING') {
+        // Also check SETUP phase so people don't get stuck if everyone leaves before start
+        const activeStatus = this.gameState.status === 'PLAYING' || this.gameState.status === 'SETUP';
+
+        if (this.players.length < 2 && activeStatus) {
             this.gameState.winner = this.players[0]; // Could be undefined if 0 players
             this.gameState.status = 'ENDED';
             this.stop();

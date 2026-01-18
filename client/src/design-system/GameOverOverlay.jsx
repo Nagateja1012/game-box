@@ -16,7 +16,8 @@ export default function GameOverOverlay({
     meUserId,
     title = "WINNER!",
     scoreLabel = "SCORE",
-    sortOrder = 'asc' // 'asc' for Uno, 'desc' for Bingo
+    sortOrder = 'asc', // 'asc' for Uno, 'desc' for Bingo
+    disableRematch = false
 }) {
     // Sort players by score
     const sortedPlayers = [...players]
@@ -116,23 +117,7 @@ export default function GameOverOverlay({
                                 {Object.keys(scores).length > 0 && (
                                     <span style={{ fontSize: '1.1rem' }}>{p.displayScore}</span>
                                 )}
-                                {p.wantsRematch && (
-                                    <div style={{
-                                        color: '#4ade80',
-                                        background: 'rgba(74, 222, 128, 0.1)',
-                                        padding: '4px',
-                                        borderRadius: '50%',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        border: '1px solid rgba(74, 222, 128, 0.3)'
-                                    }} title="Voted to Play Again">
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                    </div>
-                                )}
-                                {p.declinedRematch && (
+                                {p.declinedRematch ? (
                                     <div style={{
                                         color: '#f43f5e',
                                         background: 'rgba(244, 63, 94, 0.1)',
@@ -148,7 +133,22 @@ export default function GameOverOverlay({
                                             <line x1="6" y1="6" x2="18" y2="18"></line>
                                         </svg>
                                     </div>
-                                )}
+                                ) : p.wantsRematch ? (
+                                    <div style={{
+                                        color: '#4ade80',
+                                        background: 'rgba(74, 222, 128, 0.1)',
+                                        padding: '4px',
+                                        borderRadius: '50%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        border: '1px solid rgba(74, 222, 128, 0.3)'
+                                    }} title="Voted to Play Again">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="20 6 9 17 4 12"></polyline>
+                                        </svg>
+                                    </div>
+                                ) : null}
                             </div>
                         </div>
                     ))}
@@ -161,7 +161,7 @@ export default function GameOverOverlay({
                     marginTop: '30px',
                     alignItems: 'center'
                 }}>
-                    {onVote && (
+                    {onVote && players.length > 1 && !disableRematch && (
                         <Button
                             variant="primary"
                             disabled={players.find(p => p.userId === meUserId)?.wantsRematch}

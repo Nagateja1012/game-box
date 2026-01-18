@@ -73,7 +73,7 @@ class UndercoverGame {
             declinedRematch: false
         }));
 
-        this.maxRounds = Math.floor(this.players.length / 2);
+        this.maxRounds = Math.max(1, this.players.length - 2);
         this.assignRolesAndWords();
         this.gameStatus = 'PLAYING';
         this.startCluePhase();
@@ -200,15 +200,19 @@ class UndercoverGame {
         this.checkWinCondition();
     }
 
-    checkWinCondition() {
+    checkWinCondition(isForfeit = false) {
         const alivePlayers = this.players.filter(p => !p.isEliminated);
         const undercoverAlive = alivePlayers.filter(p => p.role === 'UNDERCOVER');
+        const civilianAlive = alivePlayers.length - undercoverAlive.length;
 
         if (undercoverAlive.length === 0) {
-            this.endGame('CIVILIANS');
-        } else if (alivePlayers.length <= 2 || (this.round >= this.maxRounds && this.phase === 'VOTE')) {
-            // If only 2 players left or 3 rounds finished
-            this.endGame('UNDERCOVER');
+            this.endGame('CIVILIANS', isForfeit);
+        } else if (civilianAlive <= undercoverAlive.length) {
+            // Parity reached: Undercovers cannot be voted out (1v1 or 2v2 etc)
+            this.endGame('UNDERCOVER', isForfeit);
+        } else if (this.round >= this.maxRounds && this.phase === 'VOTE') {
+            // Time limit reached
+            this.endGame('UNDERCOVER', isForfeit);
         } else {
             this.nextRound();
         }
@@ -225,7 +229,7 @@ class UndercoverGame {
         this.emitStateChange();
     }
 
-    endGame(winnerTeam) {
+    endGame(winnerTeam, isForfeit = false) {
         this.gameStatus = 'ENDED';
         let winnerName = '';
         if (winnerTeam === 'CIVILIANS') {
@@ -237,7 +241,8 @@ class UndercoverGame {
         this.winner = {
             team: winnerTeam,
             name: winnerName,
-            title: winnerTeam === 'CIVILIANS' ? 'CIVILIANS WON!' : 'UNDERCOVERS WON!'
+            title: winnerTeam === 'CIVILIANS' ? 'CIVILIANS WON!' : 'UNDERCOVERS WON!',
+            isForfeit
         };
         this.clearTimer();
         this.emitStateChange();
@@ -392,7 +397,8 @@ class UndercoverGame {
             this.advanceClueTurn();
         }
 
-        this.checkWinCondition();
+        // Pass true to indicate this check is triggered by a player removal (forfeiture potential)
+        this.checkWinCondition(true);
         return this.gameStatus === 'ENDED';
     }
 
