@@ -2,17 +2,20 @@ import Uno from './uno';
 import Bingo from './bingo';
 import Undercover from './undercover';
 import Fungi from './fungi';
+import Housie from './housie';
 const FUNGI_RULES = "Team up and corner opposite players. If two players from your team are within 2 units of an enemy, they convert to your team! Collect powerups like Trojan, Invert, Clone, and Ghost to gain an advantage.";
 import { UNO_RULES } from './uno/rules';
 import { BINGO_RULES } from './bingo/rules';
 import { UNDERCOVER_RULES } from './undercover/rules';
+import { HOUSIE_RULES } from './housie/rules';
 
 
 export const GAME_REGISTRY = {
     'UNO': Uno,
     'BINGO': Bingo,
     'UNDERCOVER': Undercover,
-    'FUNGI': Fungi
+    'FUNGI': Fungi,
+    'HOUSIE': Housie
 };
 
 export const GAME_METADATA = {
@@ -87,13 +90,12 @@ export const GAME_METADATA = {
     },
     'HOUSIE': {
         name: 'Housie',
-        description: 'Similar to Bingo.',
+        description: 'Classic game of chance with 3x9 tickets and auto-calling numbers.',
         image: 'https://placehold.co/600x400/8e44ad/ffffff?text=Housie',
-        rules: '',
+        rules: HOUSIE_RULES,
         minPlayers: 2,
         maxPlayers: 12,
-        category: 'solo',
-        tags: ['dev']
+        category: 'solo'
     },
     'UNDERCOVER': {
         name: 'Undercover',
