@@ -134,7 +134,7 @@ export default function Housie({ room, me }) {
         if (gameState.status === 'PLAYING' && gameState.lastCalledNumber) {
             // Delay speech slightly to allow win sounds to be heard if they trigger simultaneously
             const timer = setTimeout(() => {
-                soundManager.playSpeech(gameState.lastCalledNumber.toString(), 0.85);
+                soundManager.PlayAudio(gameState.lastCalledNumber);
             }, 500);
             return () => clearTimeout(timer);
         }

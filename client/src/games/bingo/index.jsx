@@ -166,7 +166,7 @@ export default function Bingo({ room, me }) {
     useEffect(() => {
         if (gameState.status === 'PLAYING' && gameState.lastCalledNumber && !soundManager.muted) {
             // Include lastCallTime in dependency to re-trigger same number calls
-            soundManager.playSpeech(gameState.lastCalledNumber.toString(), 0.85);
+            soundManager.PlayAudio(gameState.lastCalledNumber);
         }
     }, [gameState.lastCalledNumber, gameState.lastCallTime, gameState.status]);
 
@@ -421,7 +421,6 @@ export default function Bingo({ room, me }) {
             if (isTurn) {
                 sendGameAction({ type: 'CALL_NUMBER', number: num });
                 soundManager.playClick();
-                soundManager.playSpeech(num.toString(), 0.9);
             }
         } else if (phase === 'MARKING') {
             if (num === gs.lastCalledNumber) {
