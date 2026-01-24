@@ -3,7 +3,9 @@ import Bingo from './bingo';
 import Undercover from './undercover';
 import Fungi from './fungi';
 import Housie from './housie';
+import EightsAndFours from './eights-and-fours';
 const FUNGI_RULES = "Team up and corner opposite players. If two players from your team are within 2 units of an enemy, they convert to your team! Collect powerups like Trojan, Invert, Clone, and Ghost to gain an advantage.";
+const EIGHTS_AND_FOURS_RULES = "Eight's & Fours (Asta Chamma) is a strategic board game. Roll cowries to move. Secure at least one kill to enter the inner level. First to get all tokens to the center wins! Bonus turns for rolling 4 or 8.";
 import { UNO_RULES } from './uno/rules';
 import { BINGO_RULES } from './bingo/rules';
 import { UNDERCOVER_RULES } from './undercover/rules';
@@ -15,7 +17,8 @@ export const GAME_REGISTRY = {
     'BINGO': Bingo,
     'UNDERCOVER': Undercover,
     'FUNGI': Fungi,
-    'HOUSIE': Housie
+    'HOUSIE': Housie,
+    'EIGHTS_AND_FOURS': EightsAndFours
 };
 
 export const GAME_METADATA = {
@@ -174,6 +177,16 @@ export const GAME_METADATA = {
         minPlayers: 3,
         maxPlayers: 12,
         category: 'solo',
+        tags: ['dev']
+    },
+    'EIGHTS_AND_FOURS': {
+        name: "Eight's & Fours",
+        description: 'Futuristic Asta Chamma strategy game.',
+        image: 'https://placehold.co/600x400/0f172a/ffffff?text=Eights+%26+Fours',
+        rules: EIGHTS_AND_FOURS_RULES,
+        minPlayers: 2,
+        maxPlayers: 4,
+        category: 'team',
         tags: ['dev']
     }
 };

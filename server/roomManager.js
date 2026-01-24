@@ -4,6 +4,7 @@ const BingoGame = require('./games/bingo/logic');
 const UndercoverGame = require('./games/undercover/logic');
 const FungiGame = require('./games/fungi/logic');
 const HousieGame = require('./games/housie/logic');
+const EightsAndFoursGame = require('./games/eights-and-fours/logic');
 
 const logger = require('./utils/logger');
 const { sanitize, VALIDATION_TYPES } = require('./utils/sanitizer');
@@ -13,7 +14,8 @@ const GAME_REGISTRY = {
     'BINGO': BingoGame,
     'UNDERCOVER': UndercoverGame,
     'FUNGI': FungiGame,
-    'HOUSIE': HousieGame
+    'HOUSIE': HousieGame,
+    'EIGHTS_AND_FOURS': EightsAndFoursGame
 };
 
 function shuffleArray(array) {
